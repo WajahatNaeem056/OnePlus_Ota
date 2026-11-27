@@ -42,6 +42,7 @@ class OxygenUpdaterSource(private val http: OkHttpClient) : OtaSource {
     }
 
     override suspend fun fetch(dev: DeviceInfo, fullOnly: Boolean): SourceOutcome = withContext(Dispatchers.IO) {
+        if (dev.regionId == 1) return@withContext SourceOutcome.Error("Skipped: not used for China devices")
         val devices = JSONArray(get("devices/enabled"))
         val wanted = setOf(dev.model, dev.product, dev.marketName).filter { it.isNotBlank() }.map { it.lowercase() }
         var deviceId = -1L
