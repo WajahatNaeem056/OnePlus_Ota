@@ -211,6 +211,12 @@ fun OtherTab(vm: OtaViewModel) {
 // Shared cards
 // =================================================================================================
 @Composable
+private fun InfoLine(label: String, value: String) {
+    Text("$label  $value", fontFamily = FontFamily.Monospace, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
+}
+
+@Composable
 private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, other: Boolean, ctx: android.content.Context) {
     val status = if (vm.linkFor == pkg.url) vm.linkStatus else LinkStatus.Idle
     val shown = (status as? LinkStatus.Live)?.finalUrl ?: pkg.url
@@ -223,12 +229,8 @@ private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, other: Boolean, ctx: 
         Icon(AppIcons.Copy, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
         Text(if (status == LinkStatus.Checking) "Getting fresh link…" else "Copy link")
     }
-    pkg.md5?.let { md5 ->
-        Text("MD5  $md5", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    pkg.fileName.takeIf { !it.equals("downloadCheck", ignoreCase = true) }?.let { name ->
-        Text("File name  $name", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    pkg.md5?.let { InfoLine("MD5", it) }
+    pkg.fileName.takeIf { !it.equals("downloadCheck", ignoreCase = true) }?.let { InfoLine("File name", it) }
     Text("Source: ${pkg.source.label} · Link may expire in 15–30 minutes. Tap Check again for a fresh one.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
