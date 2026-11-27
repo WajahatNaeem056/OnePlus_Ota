@@ -104,13 +104,7 @@ private fun DeviceCard(vm: OtaViewModel) {
             Text(d.marketName.ifBlank { d.model }, style = MaterialTheme.typography.titleMedium)
             Text("Model ${d.model} · Android ${d.androidRelease}")
             Text("OTA: ${d.otaVersion.ifBlank { "unknown" }}", style = MaterialTheme.typography.bodySmall)
-            Text("Region (auto: ${regionName(d.regionId)})", style = MaterialTheme.typography.labelMedium)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = vm.regionId == null, onClick = { vm.setRegion(null) }, label = { Text("Auto") })
-                listOf(0 to "Global", 1 to "CN", 2 to "IN", 3 to "EU").forEach { (id, name) ->
-                    FilterChip(selected = vm.regionId == id, onClick = { vm.setRegion(id) }, label = { Text(name) })
-                }
-            }
+            Text("Region: ${regionName(d.regionId)}", style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -135,7 +129,7 @@ fun OtherTab(vm: OtaViewModel) {
             item {
                 OutlinedTextField(
                     value = vm.query, onValueChange = { vm.query = it }, singleLine = true,
-                    label = { Text("OnePlus device search (13R, 12, Nord…)") }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Search devices") }, modifier = Modifier.fillMaxWidth(),
                 )
             }
             if (vm.catalogLoading) item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
