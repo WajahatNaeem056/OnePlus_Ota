@@ -27,6 +27,8 @@ data class DeviceInfo(
     val regionId: Int,
     val displayVersion: String = "",
     val reqMode: String = "manual",
+    /** ro.build.oplus_nv_id (carrier/region tag). Blank = use the region default. */
+    val nvId: String = "",
 ) {
     val isOnePlus: Boolean
         get() = manufacturer.equals("OnePlus", true) || Build.BRAND.equals("OnePlus", true)
@@ -35,7 +37,7 @@ data class DeviceInfo(
         .put("product", product).put("marketName", marketName).put("otaVersion", otaVersion)
         .put("androidRelease", androidRelease).put("osVersion", osVersion)
         .put("fingerprint", fingerprint).put("regionId", regionId)
-        .put("displayVersion", displayVersion).put("reqMode", reqMode)
+        .put("displayVersion", displayVersion).put("reqMode", reqMode).put("nvId", nvId)
 
     companion object {
         fun fromJson(o: JSONObject) = DeviceInfo(
@@ -44,6 +46,7 @@ data class DeviceInfo(
             o.optString("osVersion"), o.optString("fingerprint"), o.optInt("regionId", 0),
             o.optString("displayVersion"),
             o.optString("reqMode").ifBlank { "manual" },
+            o.optString("nvId"),
         )
     }
 }
@@ -75,6 +78,7 @@ object DeviceReader {
             fingerprint = Build.FINGERPRINT,
             regionId = region,
             displayVersion = SysProps.get("ro.build.display.id").ifBlank { SysProps.get("ro.build.display.ota") }.ifBlank { Build.DISPLAY },
+            nvId = SysProps.get("ro.build.oplus_nv_id"),
         )
     }
 }

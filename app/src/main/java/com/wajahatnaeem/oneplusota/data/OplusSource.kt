@@ -22,10 +22,14 @@ class OplusClient(private val http: OkHttpClient) {
     private fun sha256Hex(s: String) =
         MessageDigest.getInstance("SHA-256").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
 
-    private fun nvCarrier(region: Int) = when (region) { 1 -> "10010111"; 3 -> "01000100"; else -> "00011011" }
+    /** Device's own tag if it has one, otherwise the default for its region (not the gateway's). */
+    private fun nvCarrier(dev: DeviceInfo) = dev.nvId.trim().ifBlank {
+        when (dev.regionId) { 1 -> "10010111"; 3 -> "01000100"; else -> "00011011" }
+    }
 
     fun query(dev: DeviceInfo, server: OplusServers.Server, otaVersion: String): JSONObject {
         val now = System.currentTimeMillis()
+        val modelName = dev.product.ifBlank { dev.model } // e.g. CPH2747EEA (region build), not just CPH2747
         val prefix = otaVersion.split("_").take(2).joinToString("_")
         val deviceId = sha256Hex("0") // no IMEI access on purpose; server accepts the placeholder
         val regionCode = when (dev.regionId) { 1 -> "CN"; 2 -> "IN"; 3 -> "EU"; else -> "GL" }
@@ -40,7 +44,7 @@ class OplusClient(private val http: OkHttpClient) {
         val body = JSONObject()
             .put("language", lang).put("romVersion", prefix).put("otaVersion", otaVersion)
             .put("androidVersion", androidVer).put("colorOSVersion", colorVer)
-            .put("model", dev.model).put("productName", dev.model)
+            .put("model", modelName).put("productName", modelName)
             .put("operator", "unknown").put("uRegion", regionCode).put("trackRegion", regionCode)
             .put("imei", "000000000000000").put("imei1", "000000000000000")
             .put("mode", "0").put("registrationId", "unknown").put("deviceId", deviceId)
@@ -52,8 +56,8 @@ class OplusClient(private val http: OkHttpClient) {
         val req = Request.Builder().url(server.url)
             .post(OplusCrypto.encryptBody(body.toString(), session).toRequestBody("application/json".toMediaType()))
             .header("language", lang).header("romVersion", prefix).header("otaVersion", otaVersion)
-            .header("androidVersion", androidVer).header("colorOSVersion", colorVer).header("model", dev.model)
-            .header("infVersion", "1").header("operator", "unknown").header("nvCarrier", nvCarrier(server.id))
+            .header("androidVersion", androidVer).header("colorOSVersion", colorVer).header("model", modelName)
+            .header("infVersion", "1").header("operator", "unknown").header("nvCarrier", nvCarrier(dev))
             .header("uRegion", regionCode).header("trackRegion", regionCode)
             .header("imei", "000000000000000").header("imei1", "000000000000000")
             .header("deviceId", deviceId).header("mode", dev.reqMode).header("channel", "pc")
@@ -162,11 +166,22 @@ class OplusClient(private val http: OkHttpClient) {
     companion object { const val FULL_MIN_BYTES = 2_000_000_000L }
 }
 
-/** "PJZ110_11.C.36_1360_202403011200" -> "PJZ110_11.C.00_0000_000000000000" (asks server for a full package). */
-internal fun baselineOtaVersion(current: String): String {
-    val parts = current.split("_")
-    val m = Regex("^\\d+\\.([A-Z])\\.").find(parts.getOrNull(1).orEmpty()) ?: return current
-    return "${parts.first()}_11.${m.groupValues[1]}.00_0000_000000000000"
+private val REGION_SUFFIXES = listOf("EEA", "IN", "RU", "TR", "CN", "EU", "TW", "MEA", "SA", "SG", "TH", "LATAM", "BR", "MY", "ID", "KZ", "OCA", "VN", "GLO", "PH", "LK")
+
+/**
+ * An "old" build string for this device, e.g. "CPH2747NV44_11.C.01_0001_100001010000".
+ * Asking with it makes the server answer with the newest FULL package even when the phone is already up to date.
+ * Null when the build letter can't be read from the phone.
+ */
+internal fun syntheticOtaVersion(dev: DeviceInfo): String? {
+    val letterRx = Regex("_11[._]([A-Z])\\.", RegexOption.IGNORE_CASE)
+    val letter = listOf(dev.otaVersion, dev.displayVersion)
+        .firstNotNullOfOrNull { letterRx.find(it)?.groupValues?.get(1)?.uppercase() } ?: return null
+    var base = dev.model.substringBefore("_11").substringBefore(".")
+    REGION_SUFFIXES.firstOrNull { base.endsWith(it, ignoreCase = true) }?.let { base = base.dropLast(it.length) }
+    base = base.replace(Regex("NV[0-9A-Z]{2}$", RegexOption.IGNORE_CASE), "")
+    val nv = dev.nvId.trim().takeIf { it.length == 4 && it.startsWith("NV", ignoreCase = true) }?.uppercase().orEmpty()
+    return "${base}${nv}_11.${letter}.01_0001_100001010000"
 }
 
 /** Primary: the device's own region gateway. Auto-detects model + OTA version from the phone. */
@@ -194,24 +209,27 @@ private fun resolve(
     client: OplusClient, dev: DeviceInfo, servers: List<OplusServers.Server>,
     fullOnly: Boolean, type: SourceType,
 ): SourceOutcome {
+    // Full-only: first ask as an old build (server hands out the newest full zip), then as the phone's real build.
+    val versions = listOfNotNull(if (fullOnly) syntheticOtaVersion(dev) else null, dev.otaVersion).distinct()
     val errors = mutableListOf<String>()
     var sawResponse = false
     for (server in servers) {
-        try {
-            var last = client.query(dev, server, dev.otaVersion)
-            var pkg = client.parse(last, type)
-            sawResponse = true
-            if (fullOnly && pkg?.isFull != true) {
-                // Ask again pretending to be on an old baseline -> server should hand out a full package.
-                last = client.query(dev, server, baselineOtaVersion(dev.otaVersion))
-                pkg = client.parse(last, type) ?: pkg
+        var onlyIncremental = false
+        var lastDesc: String? = null
+        for (v in versions) {
+            try {
+                val json = client.query(dev, server, v)
+                sawResponse = true
+                val pkg = client.parse(json, type)
+                if (pkg == null) { lastDesc = client.describe(json); continue }
+                if (!fullOnly || pkg.isFull) return SourceOutcome.Found(pkg)
+                onlyIncremental = true
+            } catch (e: Exception) {
+                errors += "${server.name}: ${e.message}"
             }
-            if (pkg == null) { errors += "${server.name}: no package (${client.describe(last)})"; continue }
-            if (fullOnly && !pkg.isFull) { errors += "${server.name}: only an incremental package was found, no full package"; continue }
-            return SourceOutcome.Found(pkg)
-        } catch (e: Exception) {
-            errors += "${server.name}: ${e.message}"
         }
+        if (onlyIncremental) errors += "${server.name}: only an incremental package was found, no full package"
+        else if (lastDesc != null) errors += "${server.name}: no package ($lastDesc)"
     }
     val msg = errors.joinToString("; ")
     return if (sawResponse) SourceOutcome.NoUpdate(msg) else SourceOutcome.Error(msg)

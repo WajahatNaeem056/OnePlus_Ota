@@ -105,7 +105,7 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             catalogLoading = true; catalogError = null
             val cache = File(app.filesDir, "oneplus_catalog.json")
-            ServiceLocator.catalog.load(cache)
+            ServiceLocator.catalog.load(cache) { app.assets.open("oneplus_devices.json").bufferedReader().use { it.readText() } }
                 .onSuccess { catalog = it }
                 .onFailure { catalogError = "Couldn't load the device list (${it.message}). Check your connection and try again." }
             catalogLoading = false

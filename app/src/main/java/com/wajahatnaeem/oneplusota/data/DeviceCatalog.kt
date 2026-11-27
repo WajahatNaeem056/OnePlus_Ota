@@ -19,27 +19,33 @@ data class CatalogVariant(val region: String, val productModel: String, val prod
     val modelShown: String get() = productName ?: productModel
     val label: String get() = when (region.uppercase()) { "GLO" -> "Global / NA"; "EU" -> "EU"; "IN" -> "India"; "CN" -> "China"; else -> region }
 
+    /** Carrier/region tag the gateways expect for this region build. */
+    val nvId: String get() = when {
+        region.startsWith("Genshin", true) -> "NV97"
+        else -> when (region.uppercase()) { "GLO" -> "NVA7"; "CN" -> "NV97"; "IN" -> "NV1B"; "EU" -> "NV44"; else -> "" }
+    }
+
     /** An "old" build for catalog devices, so the server answers with the newest. */
-    val otaVersion: String get() = "${productName ?: productModel}_11.$letter.01_0001_100001010000"
+    val otaVersion: String get() = "$productModel${nvId}_11.$letter.01_0001_100001010000"
 
     fun toDeviceInfo(marketName: String, generation: String = "") = DeviceInfo(
         manufacturer = "OnePlus", model = productModel, product = productName ?: productModel,
         marketName = marketName, otaVersion = otaVersion,
         androidRelease = Regex("\\d+").find(generation)?.value.orEmpty(), osVersion = "",
-        fingerprint = "", regionId = regionId, reqMode = reqMode,
+        fingerprint = "", regionId = regionId, reqMode = reqMode, nvId = nvId,
     )
 }
 
 data class CatalogDevice(val name: String, val android: String, val variants: List<CatalogVariant>)
 
 /**
- * Device list = community catalog (devices/oneplus.json on GitHub), fetched at runtime and cached.
+ * Device list = devices/oneplus.json from this app's own repo, fetched at runtime and cached; a copy ships inside the app as the last fallback.
  * The catalog has no separate "NA" entry: North-America units are served as Global.
  */
 class DeviceCatalog(private val http: OkHttpClient) {
-    private val url = "https://raw.githubusercontent.com/RemuruSama/OTA-Pulse/main/devices/oneplus.json"
+    private val url = "https://raw.githubusercontent.com/WajahatNaeem056/OnePlus_Ota/main/devices/oneplus.json"
 
-    suspend fun load(cache: File): Result<List<CatalogDevice>> = withContext(Dispatchers.IO) {
+    suspend fun load(cache: File, bundled: () -> String): Result<List<CatalogDevice>> = withContext(Dispatchers.IO) {
         runCatching {
             val text = try {
                 http.newCall(Request.Builder().url(url).build()).execute().use { r ->
@@ -47,7 +53,7 @@ class DeviceCatalog(private val http: OkHttpClient) {
                     r.body!!.string().also { cache.writeText(it) }
                 }
             } catch (e: Exception) {
-                if (cache.exists()) cache.readText() else throw e // offline -> last cached copy
+                if (cache.exists()) cache.readText() else bundled() // offline -> last cached copy -> copy shipped in the app
             }
             parse(text)
         }
