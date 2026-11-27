@@ -3,6 +3,11 @@ package com.wajahatnaeem.oneplusota.data
 import android.util.Log
 import com.wajahatnaeem.oneplusota.device.DeviceInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -173,9 +178,15 @@ private val REGION_SUFFIXES = listOf("EEA", "IN", "RU", "TR", "CN", "EU", "TW", 
  * Asking with it makes the server answer with the newest FULL package even when the phone is already up to date.
  * Null when the build letter can't be read from the phone.
  */
+<<<<<<< ours
 internal fun syntheticOtaVersion(dev: DeviceInfo): String? {
     val letterRx = Regex("_11[._]([A-Z])\\.", RegexOption.IGNORE_CASE)
     val letter = listOf(dev.otaVersion, dev.displayVersion)
+=======
+internal fun syntheticOtaVersion(dev: DeviceInfo, letterOverride: String? = null): String? {
+    val letterRx = Regex("_11[._]([A-Z])\\.", RegexOption.IGNORE_CASE)
+    val letter = letterOverride ?: listOf(dev.otaVersion, dev.displayVersion)
+>>>>>>> theirs
         .firstNotNullOfOrNull { letterRx.find(it)?.groupValues?.get(1)?.uppercase() } ?: return null
     var base = dev.model.substringBefore("_11").substringBefore(".")
     REGION_SUFFIXES.firstOrNull { base.endsWith(it, ignoreCase = true) }?.let { base = base.dropLast(it.length) }
@@ -201,13 +212,29 @@ class OplusGatewayFallbackSource(private val client: OplusClient) : OtaSource {
 
     override suspend fun fetch(dev: DeviceInfo, fullOnly: Boolean): SourceOutcome = withContext(Dispatchers.IO) {
         if (dev.otaVersion.isBlank()) return@withContext SourceOutcome.Error("OTA version missing")
-        resolve(client, dev, OplusServers.othersThan(dev.regionId), fullOnly, type)
+        resolve(client, dev.copy(probe = false), OplusServers.othersThan(dev.regionId), fullOnly, type)
     }
 }
 
-private fun resolve(
+private fun versionNums(v: String) =
+    Regex("\\d+").findAll(v.substringAfter('_')).map { it.value.toLongOrNull() ?: 0L }.toList()
+
+/** Both strings come from the same OnePlus server, e.g. "CPH2645_17.0.0.105(EX01)" vs "CPH2645_16.0.10.600(EX01)". */
+private fun isNewerVersion(a: String, b: String): Boolean {
+    val x = versionNums(a); val y = versionNums(b)
+    for (i in 0 until maxOf(x.size, y.size)) {
+        val p = x.getOrElse(i) { 0L }; val q = y.getOrElse(i) { 0L }
+        if (p != q) return p > q
+    }
+    return false
+}
+
+private class Probe(val json: JSONObject?, val pkg: OtaPackage?, val desc: String?, val err: String?)
+
+private suspend fun resolve(
     client: OplusClient, dev: DeviceInfo, servers: List<OplusServers.Server>,
     fullOnly: Boolean, type: SourceType,
+<<<<<<< ours
 ): SourceOutcome {
     // Full-only: first ask as an old build (server hands out the newest full zip), then as the phone's real build.
     val versions = listOfNotNull(if (fullOnly) syntheticOtaVersion(dev) else null, dev.otaVersion).distinct()
@@ -227,10 +254,50 @@ private fun resolve(
             } catch (e: Exception) {
                 errors += "${server.name}: ${e.message}"
             }
+=======
+): SourceOutcome = coroutineScope {
+    // Full-only: ask as old builds (server hands out the newest full zip) and as the phone's real build.
+    // Catalog devices don't know their build letter, so every letter is tried and the newest full package wins.
+    val versions = buildList {
+        if (fullOnly) {
+            syntheticOtaVersion(dev)?.let { add(it) }
+            if (dev.probe) ('A'..'Z').forEach { c -> syntheticOtaVersion(dev, c.toString())?.let { add(it) } }
+        }
+        add(dev.otaVersion)
+    }.distinct()
+    val errors = mutableListOf<String>()
+    var sawResponse = false
+    for (server in servers) {
+        val gate = Semaphore(6)
+        val probes = versions.map { v ->
+            async(Dispatchers.IO) {
+                gate.withPermit {
+                    try {
+                        val json = client.query(dev, server, v)
+                        Probe(json, client.parse(json, type), client.describe(json), null)
+                    } catch (e: Exception) {
+                        Probe(null, null, null, e.message)
+                    }
+                }
+            }
+        }.awaitAll()
+        if (probes.any { it.err == null }) sawResponse = true
+        val fulls = probes.filter { it.pkg != null && (!fullOnly || it.pkg.isFull) }
+        val best = fulls.reduceOrNull { x, y -> if (isNewerVersion(y.pkg!!.version, x.pkg!!.version)) y else x }
+        if (best != null) {
+            client.lastRawJson = best.json.toString()
+            return@coroutineScope SourceOutcome.Found(best.pkg!!)
+        }
+        if (probes.any { it.pkg != null }) errors += "${server.name}: only an incremental package was found, no full package"
+        else {
+            val desc = probes.firstNotNullOfOrNull { it.desc }
+            if (desc != null) errors += "${server.name}: no package ($desc)"
+            probes.mapNotNull { it.err }.distinct().take(2).forEach { errors += "${server.name}: $it" }
+>>>>>>> theirs
         }
         if (onlyIncremental) errors += "${server.name}: only an incremental package was found, no full package"
         else if (lastDesc != null) errors += "${server.name}: no package ($lastDesc)"
     }
     val msg = errors.joinToString("; ")
-    return if (sawResponse) SourceOutcome.NoUpdate(msg) else SourceOutcome.Error(msg)
+    if (sawResponse) SourceOutcome.NoUpdate(msg) else SourceOutcome.Error(msg)
 }

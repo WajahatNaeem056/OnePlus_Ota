@@ -190,7 +190,30 @@
     ],
     "firmwareGroups": {
       "Android 15": "A",
+<<<<<<< ours
       "Android 16": "F"
+=======
+      "Android 16": "F",
+      "Android 17": [
+        {
+          "displayName": "IN",
+          "productModel": "CPH2691",
+          "productName": "CPH2691IN",
+          "versionLetter": "H"
+        },
+        {
+          "displayName": "GLO",
+          "productModel": "CPH2645",
+          "versionLetter": "H"
+        },
+        {
+          "displayName": "EU",
+          "productModel": "CPH2645",
+          "productName": "CPH2645EEA",
+          "versionLetter": "H"
+        }
+      ]
+>>>>>>> theirs
     }
   },
   {
@@ -944,4 +967,8 @@
       "Android 15": "F"
     }
   }
+<<<<<<< ours
 ]
+=======
+]
+>>>>>>> theirs

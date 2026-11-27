@@ -10,7 +10,7 @@ import org.json.JSONObject
 import java.io.File
 
 /** One region build of a device (e.g. 13R / EU / CPH2645EEA). */
-data class CatalogVariant(val region: String, val productModel: String, val productName: String?, val letter: String, val reqMode: String = "manual") {
+data class CatalogVariant(val region: String, val productModel: String, val productName: String?, val letter: String, val reqMode: String = "manual", val gen: String = "") {
     val isChina: Boolean get() = region.equals("CN", true) || region.startsWith("Genshin", true)
     val regionId: Int get() = if (isChina) 1 else when (region.uppercase()) { "IN" -> 2; "EU" -> 3; else -> 0 }
     /** Short tag shown in the list, e.g. "EU", "IN", "GLO", "CN". */
@@ -19,20 +19,38 @@ data class CatalogVariant(val region: String, val productModel: String, val prod
     val modelShown: String get() = productName ?: productModel
     val label: String get() = when (region.uppercase()) { "GLO" -> "Global / NA"; "EU" -> "EU"; "IN" -> "India"; "CN" -> "China"; else -> region }
 
+<<<<<<< ours
     /** Carrier/region tag the gateways expect for this region build. */
     val nvId: String get() = when {
+=======
+    /** Region tag used in the build string. */
+    val nvTag: String get() = when {
+>>>>>>> theirs
         region.startsWith("Genshin", true) -> "NV97"
         else -> when (region.uppercase()) { "GLO" -> "NVA7"; "CN" -> "NV97"; "IN" -> "NV1B"; "EU" -> "NV44"; else -> "" }
     }
 
+<<<<<<< ours
     /** An "old" build for catalog devices, so the server answers with the newest. */
     val otaVersion: String get() = "$productModel${nvId}_11.$letter.01_0001_100001010000"
+=======
+    /** Same tag as the phones report it in ro.build.oplus_nv_id (8 binary digits, e.g. NV1B -> 00011011). */
+    val nvId: String get() = nvTag.removePrefix("NV").toIntOrNull(16)?.let { Integer.toBinaryString(it).padStart(8, '0') }.orEmpty()
+
+    /** An "old" build for catalog devices, so the server answers with the newest. */
+    val otaVersion: String get() = "$productModel${nvTag}_11.$letter.01_0001_100001010000"
+>>>>>>> theirs
 
     fun toDeviceInfo(marketName: String, generation: String = "") = DeviceInfo(
         manufacturer = "OnePlus", model = productModel, product = productName ?: productModel,
         marketName = marketName, otaVersion = otaVersion,
+<<<<<<< ours
         androidRelease = Regex("\\d+").find(generation)?.value.orEmpty(), osVersion = "",
         fingerprint = "", regionId = regionId, reqMode = reqMode, nvId = nvId,
+=======
+        androidRelease = Regex("\\d+").find(gen.ifBlank { generation })?.value.orEmpty(), osVersion = "",
+        fingerprint = "", regionId = regionId, reqMode = reqMode, nvId = nvId, probe = true,
+>>>>>>> theirs
     )
 }
 
@@ -81,27 +99,34 @@ class DeviceCatalog(private val http: OkHttpClient) {
         for (i in 0 until arr.length()) {
             val d = arr.optJSONObject(i) ?: continue
             val groups = d.optJSONObject("firmwareGroups") ?: continue
-            // newest Android generation in the catalog
-            val key = groups.keys().asSequence()
-                .maxByOrNull { Regex("\\d+").find(it)?.value?.toIntOrNull() ?: 0 } ?: continue
+            // newest Android generation first; a region that only exists in an older group keeps that older group
+            val keys = groups.keys().asSequence()
+                .sortedByDescending { Regex("\\d+").find(it)?.value?.toIntOrNull() ?: 0 }.toList()
+            val newest = keys.firstOrNull() ?: continue
             val variants = mutableListOf<CatalogVariant>()
-            fun add(o: JSONObject, groupLetter: String?) {
+            val seen = mutableSetOf<String>()
+            fun add(o: JSONObject, groupLetter: String?, gen: String) {
                 val model = o.optString("productModel")
                 if (model.isBlank()) return
+                val region = o.optString("displayName", "GLO")
+                if (!seen.add("$region|$model|${o.optString("productName")}")) return
                 variants += CatalogVariant(
-                    region = o.optString("displayName", "GLO"), productModel = model,
+                    region = region, productModel = model,
                     productName = o.optString("productName").ifBlank { null },
                     letter = o.optString("versionLetter").ifBlank { groupLetter ?: "A" },
                     reqMode = o.optString("reqMode").ifBlank { "manual" },
+                    gen = gen,
                 )
             }
-            when (val g = groups.get(key)) {
-                is String -> d.optJSONArray("variants")?.let { v ->
-                    for (j in 0 until v.length()) v.optJSONObject(j)?.let { add(it, g) }
+            for (key in keys) {
+                when (val g = groups.get(key)) {
+                    is String -> d.optJSONArray("variants")?.let { v ->
+                        for (j in 0 until v.length()) v.optJSONObject(j)?.let { add(it, g, key) }
+                    }
+                    is JSONArray -> for (j in 0 until g.length()) g.optJSONObject(j)?.let { add(it, null, key) }
                 }
-                is JSONArray -> for (j in 0 until g.length()) g.optJSONObject(j)?.let { add(it, null) }
             }
-            out += split(d.optString("name"), key, variants)
+            out += split(d.optString("name"), newest, variants)
         }
         return out
     }
