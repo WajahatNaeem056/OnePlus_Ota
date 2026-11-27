@@ -154,7 +154,7 @@ fun OtherTab(vm: OtaViewModel) {
                 Card(Modifier.fillMaxWidth().clickable { vm.pick(d, v) }) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("${d.name} (${v.code})", style = MaterialTheme.typography.titleMedium)
-                        Text("${v.modelShown} · ${d.android}", style = MaterialTheme.typography.bodySmall)
+                        Text(v.modelShown, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -166,7 +166,7 @@ fun OtherTab(vm: OtaViewModel) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         vm.variant?.let { v ->
                             Text("${sel.name} (${v.code})", style = MaterialTheme.typography.titleMedium)
-                            Text("Model ${v.modelShown} · Region: ${v.label} · ${sel.android}", style = MaterialTheme.typography.bodySmall)
+                            Text("Model ${v.modelShown} · Region: ${v.label}", style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
