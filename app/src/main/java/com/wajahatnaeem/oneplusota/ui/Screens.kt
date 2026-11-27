@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -80,15 +81,25 @@ fun UpdateTab(vm: OtaViewModel) {
     val start = rememberStarter(vm)
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { Text("OnePlus OTA", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp, start = 4.dp)) }
         if (vm.device.isOnePlus) {
             item {
-                Column(Modifier.padding(top = 8.dp, start = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(vm.device.marketName.ifBlank { vm.device.model }, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-                    Text("${vm.device.model} · Region ${regionName(vm.device.regionId)}", style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(vm.device.marketName.ifBlank { vm.device.model }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Chip(vm.device.model)
+                            Chip("Region ${regionName(vm.device.regionId)}")
+                        }
+                        Column {
+                            Text("Your build", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(vm.device.otaVersion.ifBlank { "unknown" }, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        }
+                    }
                 }
             }
-        } else item { Text("Update", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 8.dp)) }
+        }
 
         if (!vm.device.isOnePlus) {
             item {
@@ -108,10 +119,6 @@ fun UpdateTab(vm: OtaViewModel) {
             }
         }
         item { CheckCard(vm, vm.check, false) { start(it, vm.updateSpec) } }
-        item {
-            Text("Your build: ${vm.device.otaVersion.ifBlank { "unknown" }}", style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp))
-        }
         item { DownloadCard(vm, dl) }
         vm.message?.let { m -> item { Text(m, color = MaterialTheme.colorScheme.primary) } }
         item { androidx.compose.foundation.layout.Spacer(Modifier.padding(8.dp)) }
@@ -132,7 +139,7 @@ fun OtherTab(vm: OtaViewModel) {
     val sel = vm.selected
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("Other devices", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 8.dp)) }
+        item { Text("OnePlus OTA", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp, start = 4.dp)) }
 
         if (sel == null) {
             item {
@@ -161,19 +168,14 @@ fun OtherTab(vm: OtaViewModel) {
                     q.isEmpty() || "${d.name} ${v.code} ${v.label} ${v.productModel} ${v.productName.orEmpty()}".lowercase().contains(q)
                 }
             items(rows) { (d, v) ->
-                Column {
-                    Row(Modifier.fillMaxWidth().clickable { vm.pick(d, v) }.padding(horizontal = 6.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(d.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                            Text(v.modelShown, fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Surface(shape = RoundedCornerShape(9.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                            Text(v.code, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
-                        }
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceContainer)
+                    .clickable { vm.pick(d, v) }.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(d.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                        Chip(v.code)
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Text(v.modelShown, fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (!vm.catalogLoading && vm.catalogError == null && rows.isEmpty()) item { Text("No devices found") }
@@ -228,10 +230,9 @@ private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, other: Boolean, ctx: 
 }
 
 @Composable
-private fun Meta(value: String, label: String) {
-    Column {
-        Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun Chip(text: String) {
+    Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+        Text(text, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
     }
 }
 
@@ -269,12 +270,12 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, onDownlo
                 val cardColors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = cardColors) {
                     Column(Modifier.padding(18.dp)) {
-                        Text("Latest full OTA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Latest full OTA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                         Text(r.pkg.version, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                        Row(Modifier.padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                            Meta(fmt(r.pkg.sizeBytes), "Size")
-                            Meta(if (r.pkg.isFull) "Full" else "Incremental", "Type")
-                            Meta(if (r.pkg.md5 != null) "Available" else "n/a", "MD5")
+                        Row(Modifier.padding(vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Chip(fmt(r.pkg.sizeBytes))
+                            Chip(if (r.pkg.isFull) "Full" else "Incremental")
+                            Chip(if (r.pkg.md5 != null) "MD5 available" else "MD5 n/a")
                         }
                         Button(onClick = { onDownload(r.pkg) }, shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
                             Icon(AppIcons.Download, null, Modifier.size(22.dp)); Spacer(Modifier.width(8.dp))

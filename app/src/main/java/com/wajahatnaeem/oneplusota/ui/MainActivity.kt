@@ -39,6 +39,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 
 class MainActivity : ComponentActivity() {
     private val vm: OtaViewModel by viewModels()
@@ -67,7 +69,16 @@ private fun Root(vm: OtaViewModel) {
     Scaffold(
         bottomBar = { if (vm.device.isOnePlus) FloatingBar(tab) { tab = it } },
     ) { inner ->
-        Box(Modifier.padding(inner).fillMaxSize()) {
+        Box(Modifier.padding(inner).fillMaxSize().pointerInput(vm.device.isOnePlus) {
+            if (!vm.device.isOnePlus) return@pointerInput
+            val threshold = 80.dp.toPx()
+            var total = 0f
+            detectHorizontalDragGestures(
+                onDragStart = { total = 0f },
+                onHorizontalDrag = { _, dx -> total += dx },
+                onDragEnd = { if (total < -threshold) tab = 1 else if (total > threshold) tab = 0 },
+            )
+        }) {
             if (tab == 0 || !vm.device.isOnePlus) UpdateTab(vm) else OtherTab(vm)
         }
     }
@@ -78,8 +89,8 @@ private fun FloatingBar(selected: Int, onSelect: (Int) -> Unit) {
     Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
         Surface(shape = RoundedCornerShape(30.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 3.dp) {
             Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                BarItem(0, selected, AppIcons.SystemUpdate, "Update", onSelect)
-                BarItem(1, selected, AppIcons.Devices, "Other", onSelect)
+                BarItem(0, selected, AppIcons.SystemUpdate, "My phone", onSelect)
+                BarItem(1, selected, AppIcons.Devices, "Devices", onSelect)
             }
         }
     }
