@@ -53,26 +53,27 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
     var linkStatus by mutableStateOf<LinkStatus>(LinkStatus.Idle)
         private set
 
-    /** Resolves the real direct link, checks that it is live, then runs [action] with it. */
-    fun useLink(pkg: OtaPackage, action: (String) -> Unit) {
+    /**
+     * Always copies a FRESH link: asks the sources again (same device, same region), swaps the new package into the card,
+     * resolves OnePlus "/downloadCheck" links to the real direct link, then runs [action].
+     * If a fresh link can't be fetched, the current link is used and a message says so.
+     */
+    fun copyFreshLink(pkg: OtaPackage, other: Boolean, action: (String) -> Unit) {
         viewModelScope.launch {
             linkFor = pkg.url; linkStatus = LinkStatus.Checking
-            val s = ServiceLocator.linkResolver.resolve(pkg.url)
-            linkStatus = s
-            when (s) {
-                is LinkStatus.Live -> { action(s.finalUrl) }
-                is LinkStatus.Dead -> {
-                    message = "This link isn't working right now (HTTP ${s.code}). Check for the update again to get a fresh link."
-                }
-                is LinkStatus.Unknown -> {
-                    if (pkg.url.contains("/downloadCheck", ignoreCase = true)) {
-                        message = "Couldn't verify the link (${s.reason}). Check your connection and try again."
-                    } else {
-                        action(pkg.url)
-                    }
-                }
-                else -> { }
+            val spec = if (other) otherSpec else updateSpec
+            var use = pkg
+            if (spec != null) {
+                val res = ServiceLocator.chain.check(spec, fullOnly)
+                if (res is CheckResult.Found) {
+                    use = res.pkg
+                    if (other) otherCheck = CheckUi.Result(res) else check = CheckUi.Result(res)
+                } else message = "Couldn't get a fresh link, copied the last one."
             }
+            linkFor = use.url
+            val s = if (use.url.contains("/downloadCheck", ignoreCase = true)) ServiceLocator.linkResolver.resolve(use.url) else LinkStatus.Idle
+            linkStatus = LinkStatus.Idle
+            action((s as? LinkStatus.Live)?.finalUrl ?: use.url)
         }
     }
 

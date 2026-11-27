@@ -89,7 +89,7 @@ fun UpdateTab(vm: OtaViewModel) {
                 Text("Check for update")
             }
         }
-        item { CheckCard(vm, vm.check, vm.device.marketName.ifBlank { vm.device.model }) { start(it, vm.updateSpec) } }
+        item { CheckCard(vm, vm.check, false) { start(it, vm.updateSpec) } }
         item { DownloadCard(vm, dl) }
         vm.message?.let { m -> item { Text(m, color = MaterialTheme.colorScheme.primary) } }
         item { androidx.compose.foundation.layout.Spacer(Modifier.padding(8.dp)) }
@@ -191,7 +191,7 @@ fun OtherTab(vm: OtaViewModel) {
                 }
             }
             item {
-                CheckCard(vm, vm.otherCheck, "${sel.name} (${vm.variant?.label.orEmpty()})") { pkg -> vm.otherSpec?.let { start(pkg, it) } }
+                CheckCard(vm, vm.otherCheck, true) { pkg -> vm.otherSpec?.let { start(pkg, it) } }
             }
             item { DownloadCard(vm, dl) }
             vm.message?.let { m -> item { Text(m, color = MaterialTheme.colorScheme.primary) } }
@@ -204,7 +204,7 @@ fun OtherTab(vm: OtaViewModel) {
 // Shared cards
 // =================================================================================================
 @Composable
-private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, deviceLabel: String, ctx: android.content.Context) {
+private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, other: Boolean, ctx: android.content.Context) {
     val status = if (vm.linkFor == pkg.url) vm.linkStatus else LinkStatus.Idle
     val shown = (status as? LinkStatus.Live)?.finalUrl ?: pkg.url
 
@@ -212,30 +212,15 @@ private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, deviceLabel: String, 
     Text("Download link", style = MaterialTheme.typography.labelMedium)
     Text(shown, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
         modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp))
-    Button(onClick = { vm.useLink(pkg) { LinkTools.copy(ctx, "Link", it) } }, modifier = Modifier.fillMaxWidth()) { Text("Copy link") }
+    Button(onClick = { vm.copyFreshLink(pkg, other) { LinkTools.copy(ctx, "Fresh link", it) } },
+        enabled = status != LinkStatus.Checking, modifier = Modifier.fillMaxWidth()) {
+        Text(if (status == LinkStatus.Checking) "Getting fresh link…" else "Copy link")
+    }
     pkg.md5?.let { md5 ->
         Text("MD5: $md5", fontFamily = FontFamily.Monospace, fontSize = 12.sp,
             modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp))
-        OutlinedButton(onClick = { LinkTools.copy(ctx, "MD5", md5) }, modifier = Modifier.fillMaxWidth()) { Text("Copy MD5") }
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { vm.useLink(pkg) { LinkTools.share(ctx, LinkTools.shareText(deviceLabel, pkg, it)) } }, modifier = Modifier.weight(1f)) { Text("Share") }
-        OutlinedButton(onClick = { vm.useLink(pkg) { LinkTools.openWith(ctx, it) } }, modifier = Modifier.weight(1f)) { Text("Open with") }
-    }
-    when (status) {
-        LinkStatus.Checking -> Text("Checking the link…", style = MaterialTheme.typography.bodySmall)
-        is LinkStatus.Live -> Text(
-            "Link is live ✓ · ${LinkTools.bytes(status.sizeBytes)} · " +
-                (if (status.resumable) "supports resume" else "no resume support") +
-                (if (status.redirected) " · direct link resolved" else ""),
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
-        )
-        is LinkStatus.Dead -> Text("Link not working (HTTP ${status.code}). Check for the update again for a fresh link.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        is LinkStatus.Unknown -> Text("Couldn't verify the link (${status.reason}).", style = MaterialTheme.typography.bodySmall)
-        LinkStatus.Idle -> {}
-    }
-    Text("OnePlus links can expire after some hours or days. The MD5 is included when you share.",
+    Text("Links can expire after some hours or days.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
@@ -263,7 +248,7 @@ private fun Collapsible(title: String, body: String) {
 }
 
 @Composable
-private fun CheckCard(vm: OtaViewModel, state: CheckUi, deviceLabel: String, onDownload: (OtaPackage) -> Unit) {
+private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, onDownload: (OtaPackage) -> Unit) {
     val ctx = LocalContext.current
     when (state) {
         CheckUi.Idle -> {}
@@ -275,7 +260,7 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, deviceLabel: String, onD
                     Text("${fmt(r.pkg.sizeBytes)} · ${if (r.pkg.isFull) "FULL" else "incremental"} · MD5 ${if (r.pkg.md5 != null) "available" else "n/a"}")
                     Text("Source: ${r.pkg.source.label}", style = MaterialTheme.typography.bodySmall)
                     Button(onClick = { onDownload(r.pkg) }, modifier = Modifier.fillMaxWidth()) { Text("Download") }
-                    LinkSection(vm, r.pkg, deviceLabel, ctx)
+                    LinkSection(vm, r.pkg, other, ctx)
                     if (r.notes.isNotEmpty()) Collapsible("Source log", r.notes.joinToString("\n") { "• $it" })
                     r.pkg.changelog?.let { Expandable(cleanChangelog(it)) }
                 }
