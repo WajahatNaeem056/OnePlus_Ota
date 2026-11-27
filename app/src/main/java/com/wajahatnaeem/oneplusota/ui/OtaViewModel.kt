@@ -124,7 +124,7 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
     fun selectVariant(v: CatalogVariant) { variant = v; otherCheck = CheckUi.Idle }
 
     val otherSpec: DeviceInfo?
-        get() = variant?.let { v -> selected?.let { v.toDeviceInfo(it.name) } }
+        get() = variant?.let { v -> selected?.let { v.toDeviceInfo(it.name, it.android) } }
 
     fun checkOther() {
         val spec = otherSpec ?: return

@@ -14,7 +14,6 @@ import java.security.MessageDigest
 
 /**
  * Talks to OnePlus/Oplus OTA servers directly.
- * NOTE: ported from decompiled code and NOT yet verified against a live response on a real device.
  * The raw decrypted JSON is kept in [lastRawJson] so field names can be calibrated quickly.
  */
 class OplusClient(private val http: OkHttpClient) {
@@ -30,6 +29,7 @@ class OplusClient(private val http: OkHttpClient) {
         val prefix = otaVersion.split("_").take(2).joinToString("_")
         val deviceId = sha256Hex("0") // no IMEI access on purpose; server accepts the placeholder
         val regionCode = when (dev.regionId) { 1 -> "CN"; 2 -> "IN"; 3 -> "EU"; else -> "GL" }
+        val lang = if (regionCode == "CN") "zh-CN" else "en-EN"
         val rui = Regex("(\\d+)").find(dev.osVersion)?.value?.toIntOrNull()?.takeIf { it > 0 } ?: dev.androidRelease.toIntOrNull()
         val (androidVer, colorVer) = when {
             rui == null || rui < 11 -> "unknown" to "unknown"
@@ -38,25 +38,25 @@ class OplusClient(private val http: OkHttpClient) {
         }
 
         val body = JSONObject()
-            .put("language", "en-EN").put("romVersion", prefix).put("otaVersion", otaVersion)
+            .put("language", lang).put("romVersion", prefix).put("otaVersion", otaVersion)
             .put("androidVersion", androidVer).put("colorOSVersion", colorVer)
             .put("model", dev.model).put("productName", dev.model)
             .put("operator", "unknown").put("uRegion", regionCode).put("trackRegion", regionCode)
             .put("imei", "000000000000000").put("imei1", "000000000000000")
             .put("mode", "0").put("registrationId", "unknown").put("deviceId", deviceId)
             .put("version", "3").put("type", "1").put("otaPrefix", prefix)
-            .put("isRealme", "unknown").put("time", now.toString())
+            .put("isRealme", "0").put("time", now.toString())
             .put("canCheckSelf", "0").put("gray", "0").put("reqMode", "manual")
 
         val session = OplusCrypto.newSession()
         val req = Request.Builder().url(server.url)
             .post(OplusCrypto.encryptBody(body.toString(), session).toRequestBody("application/json".toMediaType()))
-            .header("language", "en-EN").header("romVersion", prefix).header("otaVersion", otaVersion)
+            .header("language", lang).header("romVersion", prefix).header("otaVersion", otaVersion)
             .header("androidVersion", androidVer).header("colorOSVersion", colorVer).header("model", dev.model)
             .header("infVersion", "1").header("operator", "unknown").header("nvCarrier", nvCarrier(server.id))
             .header("uRegion", regionCode).header("trackRegion", regionCode)
             .header("imei", "000000000000000").header("imei1", "000000000000000")
-            .header("deviceId", deviceId).header("mode", "client_auto").header("channel", "pc")
+            .header("deviceId", deviceId).header("mode", "manual").header("channel", "pc")
             .header("version", "2").header("Accept", "application/json")
             .header("User-Agent", "NULL")
             .header("protectedKey", OplusCrypto.protectedKeyHeader(session, server, now))
@@ -64,19 +64,33 @@ class OplusClient(private val http: OkHttpClient) {
 
         http.newCall(req).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) error("HTTP ${resp.code} from ${server.name} gateway")
+            if (!resp.isSuccessful) error("HTTP ${resp.code} from ${server.name} gateway: ${text.take(120)}")
             val outer = JSONObject(text)
-            // Response is either {cipher, iv} directly or wrapped in "resps".
-            val enc: JSONObject = when {
-                outer.has("cipher") && outer.has("iv") -> outer
-                outer.has("resps") -> JSONObject(outer.getString("resps"))
-                else -> error("Unexpected response shape: ${text.take(160)}")
-            }
+            val enc = findCipherObject(outer) ?: error(
+                "Unexpected response shape (keys=${outer.keys().asSequence().toList()}, " +
+                    "code=${outer.opt("responseCode")}, errMsg=${outer.optString("errMsg")}): ${text.take(160)}",
+            )
             val plain = OplusCrypto.decrypt(enc.getString("cipher"), enc.getString("iv"), session)
             lastRawJson = plain
             Log.d("OplusClient", "decrypted: ${plain.take(400)}")
             return JSONObject(plain)
         }
+    }
+
+    private fun asObj(v: Any?): JSONObject? = when (v) {
+        is JSONObject -> v
+        is String -> runCatching { JSONObject(v) }.getOrNull()
+        else -> null
+    }
+
+    /** {cipher, iv} can sit at the top level or inside body / resps / params (as text or object). */
+    private fun findCipherObject(outer: JSONObject): JSONObject? {
+        if (outer.has("cipher") && outer.has("iv")) return outer
+        for (k in listOf("body", "resps", "params")) {
+            val o = asObj(outer.opt(k)) ?: continue
+            if (o.has("cipher") && o.has("iv")) return o
+        }
+        return null
     }
 
     // ---- parsing -------------------------------------------------------------------------------
@@ -101,6 +115,16 @@ class OplusClient(private val http: OkHttpClient) {
             is JSONArray -> for (i in 0 until o.length()) findString(o.opt(i), key)?.let { return it }
         }
         return null
+    }
+
+    /** Short human-readable reason from the server JSON (errMsg / checkFailReason / code) for the Source log. */
+    fun describe(json: JSONObject): String {
+        val parts = listOfNotNull(
+            findString(json, "responseCode")?.let { "code $it" },
+            findString(json, "errMsg")?.let { "errMsg: $it" },
+            findString(json, "checkFailReason")?.let { "reason: $it" },
+        )
+        return parts.ifEmpty { listOf(json.toString().take(160)) }.joinToString(", ")
     }
 
     /** Picks the biggest component that has a URL (the main OTA zip). Returns null when none. */
@@ -141,8 +165,8 @@ class OplusClient(private val http: OkHttpClient) {
 /** "PJZ110_11.C.36_1360_202403011200" -> "PJZ110_11.C.00_0000_000000000000" (asks server for a full package). */
 internal fun baselineOtaVersion(current: String): String {
     val parts = current.split("_")
-    val letter = parts.getOrNull(1)?.split(".")?.getOrNull(1) ?: "A"
-    return "${parts.firstOrNull().orEmpty()}_11.$letter.00_0000_000000000000"
+    val m = Regex("^\\d+\\.([A-Z])\\.").find(parts.getOrNull(1).orEmpty()) ?: return current
+    return "${parts.first()}_11.${m.groupValues[1]}.00_0000_000000000000"
 }
 
 /** Primary: the device's own region gateway. Auto-detects model + OTA version from the phone. */
@@ -174,13 +198,15 @@ private fun resolve(
     var sawResponse = false
     for (server in servers) {
         try {
-            var pkg = client.parse(client.query(dev, server, dev.otaVersion), type)
+            var last = client.query(dev, server, dev.otaVersion)
+            var pkg = client.parse(last, type)
             sawResponse = true
             if (fullOnly && pkg?.isFull != true) {
                 // Ask again pretending to be on an old baseline -> server should hand out a full package.
-                pkg = client.parse(client.query(dev, server, baselineOtaVersion(dev.otaVersion)), type)
+                last = client.query(dev, server, baselineOtaVersion(dev.otaVersion))
+                pkg = client.parse(last, type) ?: pkg
             }
-            if (pkg == null) { errors += "${server.name}: no package in response"; continue }
+            if (pkg == null) { errors += "${server.name}: no package (${client.describe(last)})"; continue }
             if (fullOnly && !pkg.isFull) { errors += "${server.name}: only an incremental package was found, no full package"; continue }
             return SourceOutcome.Found(pkg)
         } catch (e: Exception) {

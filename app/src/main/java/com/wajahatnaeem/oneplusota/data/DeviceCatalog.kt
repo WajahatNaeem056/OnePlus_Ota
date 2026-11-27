@@ -22,9 +22,10 @@ data class CatalogVariant(val region: String, val productModel: String, val prod
     /** An "old" build for catalog devices, so the server answers with the newest. */
     val otaVersion: String get() = "${productName ?: productModel}_11.$letter.01_0001_100001010000"
 
-    fun toDeviceInfo(marketName: String) = DeviceInfo(
+    fun toDeviceInfo(marketName: String, generation: String = "") = DeviceInfo(
         manufacturer = "OnePlus", model = productModel, product = productName ?: productModel,
-        marketName = marketName, otaVersion = otaVersion, androidRelease = "", osVersion = "",
+        marketName = marketName, otaVersion = otaVersion,
+        androidRelease = Regex("\\d+").find(generation)?.value.orEmpty(), osVersion = "",
         fingerprint = "", regionId = regionId,
     )
 }
