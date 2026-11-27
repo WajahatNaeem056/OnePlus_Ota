@@ -3,9 +3,9 @@ package com.wajahatnaeem.oneplusota.data
 import org.json.JSONObject
 
 enum class SourceType(val label: String) {
-    OPLUS_DIRECT("Auto-detect (OnePlus server)"),
-    OXYGEN_UPDATER("Oxygen Updater (fallback)"),
-    OPLUS_GATEWAYS("Other OnePlus gateways (fallback)"),
+    OPLUS_DIRECT("OnePlus Server"),
+    OXYGEN_UPDATER("Oxygen Updater"),
+    OPLUS_GATEWAYS("OnePlus Gateway"),
 }
 
 data class OtaPackage(

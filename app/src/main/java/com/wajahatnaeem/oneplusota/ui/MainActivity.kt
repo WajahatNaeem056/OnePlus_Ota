@@ -6,12 +6,25 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -52,15 +65,36 @@ private fun Root(vm: OtaViewModel) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     // Scaffold applies the status-bar / navigation-bar insets, so the title never overlaps the clock.
     Scaffold(
-        bottomBar = {
-            if (vm.device.isOnePlus) NavigationBar {
-                NavigationBarItem(selected = tab == 0, onClick = { tab = 0 }, icon = { Text("⬇") }, label = { Text("Update") })
-                NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Text("📱") }, label = { Text("Other") })
-            }
-        },
+        bottomBar = { if (vm.device.isOnePlus) FloatingBar(tab) { tab = it } },
     ) { inner ->
         Box(Modifier.padding(inner).fillMaxSize()) {
             if (tab == 0 || !vm.device.isOnePlus) UpdateTab(vm) else OtherTab(vm)
         }
+    }
+}
+
+@Composable
+private fun FloatingBar(selected: Int, onSelect: (Int) -> Unit) {
+    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
+        Surface(shape = RoundedCornerShape(30.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 3.dp) {
+            Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                BarItem(0, selected, AppIcons.SystemUpdate, "Update", onSelect)
+                BarItem(1, selected, AppIcons.Devices, "Other", onSelect)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BarItem(index: Int, selected: Int, icon: ImageVector, label: String, onSelect: (Int) -> Unit) {
+    val on = index == selected
+    val bg = if (on) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
+    val fg = if (on) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        Modifier.clip(RoundedCornerShape(24.dp)).background(bg).clickable { onSelect(index) }.padding(horizontal = 20.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
+        Text(label, color = fg, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal)
     }
 }

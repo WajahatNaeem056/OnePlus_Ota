@@ -12,6 +12,10 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,6 +24,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -41,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import com.wajahatnaeem.oneplusota.data.LinkStatus
@@ -71,7 +80,15 @@ fun UpdateTab(vm: OtaViewModel) {
     val start = rememberStarter(vm)
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("Update", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 8.dp)) }
+        if (vm.device.isOnePlus) {
+            item {
+                Column(Modifier.padding(top = 8.dp, start = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(vm.device.marketName.ifBlank { vm.device.model }, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                    Text("${vm.device.model} · Region ${regionName(vm.device.regionId)}", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else item { Text("Update", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 8.dp)) }
 
         if (!vm.device.isOnePlus) {
             item {
@@ -83,29 +100,21 @@ fun UpdateTab(vm: OtaViewModel) {
             return@LazyColumn
         }
 
-        item { DeviceCard(vm) }
         item {
-            Button(onClick = vm::checkUpdate, modifier = Modifier.fillMaxWidth(), enabled = vm.check != CheckUi.Loading) {
-                Text("Check for update")
+            Button(onClick = vm::checkUpdate, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(26.dp),
+                enabled = vm.check != CheckUi.Loading) {
+                Icon(AppIcons.Refresh, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
+                Text(if (vm.check is CheckUi.Result) "Check again" else "Check for update")
             }
         }
         item { CheckCard(vm, vm.check, false) { start(it, vm.updateSpec) } }
+        item {
+            Text("Your build: ${vm.device.otaVersion.ifBlank { "unknown" }}", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp))
+        }
         item { DownloadCard(vm, dl) }
         vm.message?.let { m -> item { Text(m, color = MaterialTheme.colorScheme.primary) } }
         item { androidx.compose.foundation.layout.Spacer(Modifier.padding(8.dp)) }
-    }
-}
-
-@Composable
-private fun DeviceCard(vm: OtaViewModel) {
-    val d = vm.device
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(d.marketName.ifBlank { d.model }, style = MaterialTheme.typography.titleMedium)
-            Text("Model ${d.model} · Android ${d.androidRelease}")
-            Text("OTA: ${d.otaVersion.ifBlank { "unknown" }}", style = MaterialTheme.typography.bodySmall)
-            Text("Region: ${regionName(d.regionId)}", style = MaterialTheme.typography.labelMedium)
-        }
     }
 }
 
@@ -129,7 +138,8 @@ fun OtherTab(vm: OtaViewModel) {
             item {
                 OutlinedTextField(
                     value = vm.query, onValueChange = { vm.query = it }, singleLine = true,
-                    label = { Text("Search devices") }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Search devices") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
+                    leadingIcon = { Icon(AppIcons.Search, null, Modifier.size(22.dp)) },
                 )
             }
             if (vm.catalogLoading) item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
@@ -151,11 +161,19 @@ fun OtherTab(vm: OtaViewModel) {
                     q.isEmpty() || "${d.name} ${v.code} ${v.label} ${v.productModel} ${v.productName.orEmpty()}".lowercase().contains(q)
                 }
             items(rows) { (d, v) ->
-                Card(Modifier.fillMaxWidth().clickable { vm.pick(d, v) }) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("${d.name} (${v.code})", style = MaterialTheme.typography.titleMedium)
-                        Text(v.modelShown, style = MaterialTheme.typography.bodySmall)
+                Column {
+                    Row(Modifier.fillMaxWidth().clickable { vm.pick(d, v) }.padding(horizontal = 6.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(d.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                            Text(v.modelShown, fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Surface(shape = RoundedCornerShape(9.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                            Text(v.code, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+                        }
                     }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 }
             }
             if (!vm.catalogLoading && vm.catalogError == null && rows.isEmpty()) item { Text("No devices found") }
@@ -194,20 +212,27 @@ private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, other: Boolean, ctx: 
     val status = if (vm.linkFor == pkg.url) vm.linkStatus else LinkStatus.Idle
     val shown = (status as? LinkStatus.Live)?.finalUrl ?: pkg.url
 
-    HorizontalDivider(Modifier.padding(vertical = 8.dp))
-    Text("Download link", style = MaterialTheme.typography.labelMedium)
+    Text("Download link", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Text(shown, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp))
-    Button(onClick = { vm.copyFreshLink(pkg, other) { LinkTools.copy(ctx, "Fresh link", it) } },
-        enabled = status != LinkStatus.Checking, modifier = Modifier.fillMaxWidth()) {
+        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(14.dp)).padding(12.dp))
+    FilledTonalButton(onClick = { vm.copyFreshLink(pkg, other) { LinkTools.copy(ctx, "Fresh link", it) } },
+        enabled = status != LinkStatus.Checking, shape = RoundedCornerShape(23.dp), modifier = Modifier.fillMaxWidth().height(46.dp)) {
+        Icon(AppIcons.Copy, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
         Text(if (status == LinkStatus.Checking) "Getting fresh link…" else "Copy link")
     }
     pkg.md5?.let { md5 ->
-        Text("MD5: $md5", fontFamily = FontFamily.Monospace, fontSize = 12.sp,
-            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp))
+        Text("MD5  $md5", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    Text("Links can expire after some hours or days.",
+    Text("Source: ${pkg.source.label} · Links can expire after some hours or days.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun Meta(value: String, label: String) {
+    Column {
+        Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 /** Removes markdown heading marks (##) that some changelogs contain. */
@@ -240,15 +265,33 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, onDownlo
         CheckUi.Idle -> {}
         CheckUi.Loading -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
         is CheckUi.Result -> when (val r = state.r) {
-            is CheckResult.Found -> Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(r.pkg.version, style = MaterialTheme.typography.titleMedium)
-                    Text("${fmt(r.pkg.sizeBytes)} · ${if (r.pkg.isFull) "FULL" else "incremental"} · MD5 ${if (r.pkg.md5 != null) "available" else "n/a"}")
-                    Text("Source: ${r.pkg.source.label}", style = MaterialTheme.typography.bodySmall)
-                    Button(onClick = { onDownload(r.pkg) }, modifier = Modifier.fillMaxWidth()) { Text("Download") }
-                    LinkSection(vm, r.pkg, other, ctx)
-                    if (r.notes.isNotEmpty()) Collapsible("Source log", r.notes.joinToString("\n") { "• $it" })
-                    r.pkg.changelog?.let { Expandable(cleanChangelog(it)) }
+            is CheckResult.Found -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val cardColors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = cardColors) {
+                    Column(Modifier.padding(18.dp)) {
+                        Text("Latest full OTA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(r.pkg.version, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Row(Modifier.padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                            Meta(fmt(r.pkg.sizeBytes), "Size")
+                            Meta(if (r.pkg.isFull) "Full" else "Incremental", "Type")
+                            Meta(if (r.pkg.md5 != null) "Available" else "n/a", "MD5")
+                        }
+                        Button(onClick = { onDownload(r.pkg) }, shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                            Icon(AppIcons.Download, null, Modifier.size(22.dp)); Spacer(Modifier.width(8.dp))
+                            Text("Download")
+                        }
+                    }
+                }
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = cardColors) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { LinkSection(vm, r.pkg, other, ctx) }
+                }
+                if (r.notes.isNotEmpty() || r.pkg.changelog != null) {
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = cardColors) {
+                        Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                            if (r.notes.isNotEmpty()) Collapsible("Source log", r.notes.joinToString("\n") { "• $it" })
+                            r.pkg.changelog?.let { Expandable(cleanChangelog(it)) }
+                        }
+                    }
                 }
             }
             is CheckResult.NoPackage, is CheckResult.Failed -> {
