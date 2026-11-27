@@ -109,6 +109,10 @@ class ResumableDownloader(private val http: OkHttpClient, private val net: Netwo
             val rb = Request.Builder().url(job.pkg.url)
                 .header("Accept-Encoding", "identity") // keep Range / Content-Length byte-exact
                 .header("User-Agent", "OnePlusOTA/0.1")
+            if (job.pkg.url.contains("/downloadCheck", ignoreCase = true)) {
+                // OnePlus link-check endpoint: only answers with these headers, then redirects to the CDN.
+                rb.header("userId", "oplus-ota|16002018").header("User-Agent", "okhttp/3.12.12")
+            }
             if (have > 0) {
                 rb.header("Range", "bytes=$have-")
                 (job.etag ?: job.lastModified)?.let { rb.header("If-Range", it) }

@@ -4,7 +4,10 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -35,7 +39,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+import com.king.oneplusota.data.LinkStatus
 import androidx.compose.ui.unit.dp
 import com.king.oneplusota.data.CheckResult
 import com.king.oneplusota.data.OtaPackage
@@ -81,7 +89,7 @@ fun UpdateTab(vm: OtaViewModel) {
                 Text("Check for update")
             }
         }
-        item { CheckCard(vm, vm.check) { start(it, vm.updateSpec) } }
+        item { CheckCard(vm, vm.check, vm.device.marketName.ifBlank { vm.device.model }) { start(it, vm.updateSpec) } }
         item { DownloadCard(vm, dl) }
         vm.message?.let { m -> item { Text(m, color = MaterialTheme.colorScheme.primary) } }
         item { androidx.compose.foundation.layout.Spacer(Modifier.padding(8.dp)) }
@@ -182,7 +190,9 @@ fun OtherTab(vm: OtaViewModel) {
                     Text("Find latest full OTA")
                 }
             }
-            item { CheckCard(vm, vm.otherCheck) { pkg -> vm.otherSpec?.let { start(pkg, it) } } }
+            item {
+                CheckCard(vm, vm.otherCheck, "${sel.name} (${vm.variant?.label.orEmpty()})") { pkg -> vm.otherSpec?.let { start(pkg, it) } }
+            }
             item { DownloadCard(vm, dl) }
             vm.message?.let { m -> item { Text(m, color = MaterialTheme.colorScheme.primary) } }
         }
@@ -193,6 +203,50 @@ fun OtherTab(vm: OtaViewModel) {
 // =================================================================================================
 // Shared cards
 // =================================================================================================
+@Composable
+private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, deviceLabel: String, ctx: android.content.Context) {
+    val status = if (vm.linkFor == pkg.url) vm.linkStatus else LinkStatus.Idle
+    val shown = (status as? LinkStatus.Live)?.finalUrl ?: pkg.url
+    val box = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(start = 10.dp, top = 4.dp, bottom = 4.dp, end = 4.dp)
+
+    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+    Text("Download link", style = MaterialTheme.typography.labelMedium)
+    Row(box, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SelectionContainer(Modifier.weight(1f)) {
+            Text(shown, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        OutlinedButton(onClick = { vm.useLink(pkg) { LinkTools.copy(ctx, "Link", it) } }) { Text("Copy") }
+    }
+    pkg.md5?.let { md5 ->
+        Row(box, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("MD5", style = MaterialTheme.typography.labelMedium)
+            SelectionContainer(Modifier.weight(1f)) {
+                Text(md5, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            OutlinedButton(onClick = { LinkTools.copy(ctx, "MD5", md5) }) { Text("Copy") }
+        }
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = { vm.useLink(pkg) { LinkTools.share(ctx, LinkTools.shareText(deviceLabel, pkg, it)) } }, modifier = Modifier.weight(1f)) { Text("Share") }
+        OutlinedButton(onClick = { vm.useLink(pkg) { LinkTools.openWith(ctx, it) } }, modifier = Modifier.weight(1f)) { Text("Open with") }
+    }
+    when (status) {
+        LinkStatus.Checking -> Text("Checking the link…", style = MaterialTheme.typography.bodySmall)
+        is LinkStatus.Live -> Text(
+            "Link is live ✓ · ${LinkTools.bytes(status.sizeBytes)} · " +
+                (if (status.resumable) "supports resume" else "no resume support") +
+                (if (status.redirected) " · direct link resolved" else ""),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
+        )
+        is LinkStatus.Dead -> Text("Link not working (HTTP ${status.code}). Check for the update again for a fresh link.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        is LinkStatus.Unknown -> Text("Couldn't verify the link (${status.reason}).", style = MaterialTheme.typography.bodySmall)
+        LinkStatus.Idle -> {}
+    }
+    Text("OnePlus links can expire after some hours or days. The MD5 is included when you share.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
 /** Removes markdown heading marks (##) that some changelogs contain. */
 private fun cleanChangelog(s: String) = s.lines().joinToString("\n") { it.trimStart('#').trim() }
 
@@ -217,7 +271,8 @@ private fun Collapsible(title: String, body: String) {
 }
 
 @Composable
-private fun CheckCard(vm: OtaViewModel, state: CheckUi, onDownload: (OtaPackage) -> Unit) {
+private fun CheckCard(vm: OtaViewModel, state: CheckUi, deviceLabel: String, onDownload: (OtaPackage) -> Unit) {
+    val ctx = LocalContext.current
     when (state) {
         CheckUi.Idle -> {}
         CheckUi.Loading -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
@@ -228,6 +283,7 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, onDownload: (OtaPackage)
                     Text("${fmt(r.pkg.sizeBytes)} · ${if (r.pkg.isFull) "FULL" else "incremental"} · MD5 ${if (r.pkg.md5 != null) "available" else "n/a"}")
                     Text("Source: ${r.pkg.source.label}", style = MaterialTheme.typography.bodySmall)
                     Button(onClick = { onDownload(r.pkg) }, modifier = Modifier.fillMaxWidth()) { Text("Download") }
+                    LinkSection(vm, r.pkg, deviceLabel, ctx)
                     if (r.notes.isNotEmpty()) Collapsible("Source log", r.notes.joinToString("\n") { "• $it" })
                     r.pkg.changelog?.let { Expandable(cleanChangelog(it)) }
                 }

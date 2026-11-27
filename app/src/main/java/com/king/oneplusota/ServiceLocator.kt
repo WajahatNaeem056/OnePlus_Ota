@@ -20,6 +20,8 @@ object ServiceLocator {
 
     val oplusClient by lazy { OplusClient(http) }
 
+    val linkResolver by lazy { com.king.oneplusota.data.LinkResolver(http) }
+
     val catalog: com.king.oneplusota.data.DeviceCatalog by lazy {
         com.king.oneplusota.data.DeviceCatalog(http)
     }

@@ -15,6 +15,7 @@ import com.king.oneplusota.ServiceLocator
 import com.king.oneplusota.data.CatalogDevice
 import com.king.oneplusota.data.CatalogVariant
 import com.king.oneplusota.data.CheckResult
+import com.king.oneplusota.data.LinkStatus
 import com.king.oneplusota.data.OtaPackage
 import com.king.oneplusota.device.DeviceInfo
 import com.king.oneplusota.device.DeviceReader
@@ -45,6 +46,35 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
     var check by mutableStateOf<CheckUi>(CheckUi.Idle)
         private set
     var message by mutableStateOf<String?>(null)
+
+    // ---- link tools: resolve + verify the link before it is copied / shared / opened -------------------
+    var linkFor by mutableStateOf<String?>(null)
+        private set
+    var linkStatus by mutableStateOf<LinkStatus>(LinkStatus.Idle)
+        private set
+
+    /** Resolves the real direct link, checks that it is live, then runs [action] with it. */
+    fun useLink(pkg: OtaPackage, action: (String) -> Unit) {
+        viewModelScope.launch {
+            linkFor = pkg.url; linkStatus = LinkStatus.Checking
+            val s = ServiceLocator.linkResolver.resolve(pkg.url)
+            linkStatus = s
+            when (s) {
+                is LinkStatus.Live -> { action(s.finalUrl) }
+                is LinkStatus.Dead -> {
+                    message = "This link isn't working right now (HTTP ${s.code}). Check for the update again to get a fresh link."
+                }
+                is LinkStatus.Unknown -> {
+                    if (pkg.url.contains("/downloadCheck", ignoreCase = true)) {
+                        message = "Couldn't verify the link (${s.reason}). Check your connection and try again."
+                    } else {
+                        action(pkg.url)
+                    }
+                }
+                else -> { }
+            }
+        }
+    }
 
     init { DownloadCenter.restore(store) }
 
@@ -94,14 +124,14 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
     fun checkOther() {
         val spec = otherSpec ?: return
         viewModelScope.launch {
-            otherCheck = CheckUi.Loading
+            otherCheck = CheckUi.Loading; linkFor = null; linkStatus = LinkStatus.Idle
             otherCheck = CheckUi.Result(ServiceLocator.chain.check(spec, fullOnly))
         }
     }
 
     fun checkUpdate() {
         viewModelScope.launch {
-            check = CheckUi.Loading
+            check = CheckUi.Loading; linkFor = null; linkStatus = LinkStatus.Idle
             check = CheckUi.Result(ServiceLocator.chain.check(updateSpec, fullOnly))
         }
     }
