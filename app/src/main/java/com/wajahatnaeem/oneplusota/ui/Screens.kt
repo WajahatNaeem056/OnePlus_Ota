@@ -212,7 +212,7 @@ fun OtherTab(vm: OtaViewModel) {
 // =================================================================================================
 @Composable
 private fun InfoLine(label: String, value: String) {
-    Text("$label  $value", fontFamily = FontFamily.Monospace, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+    Text("$label $value", fontFamily = FontFamily.Monospace, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
 }
 
@@ -229,8 +229,10 @@ private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, other: Boolean, ctx: 
         Icon(AppIcons.Copy, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
         Text(if (status == LinkStatus.Checking) "Getting fresh link…" else "Copy link")
     }
-    pkg.md5?.let { InfoLine("MD5", it) }
-    pkg.fileName.takeIf { !it.equals("downloadCheck", ignoreCase = true) }?.let { InfoLine("File name", it) }
+    Column {
+        pkg.fileName.takeIf { !it.equals("downloadCheck", ignoreCase = true) }?.let { InfoLine("File name:", it) }
+        pkg.md5?.let { InfoLine("MD5:", it) }
+    }
     Text("Source: ${pkg.source.label} · Link may expire in 15–30 minutes. Tap Check again for a fresh one.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
