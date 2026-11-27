@@ -44,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -225,6 +226,10 @@ private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, other: Boolean, ctx: 
     }
     pkg.md5?.let { md5 ->
         Text("MD5  $md5", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    val realName by produceState<String?>(null, pkg.url) { value = null; value = vm.resolveFileName(pkg) }
+    realName?.let { name ->
+        Text("File name  $name", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     Text("Source: ${pkg.source.label} · Link may expire in 15–30 minutes. Tap Check again for a fresh one.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

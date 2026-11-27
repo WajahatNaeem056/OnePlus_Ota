@@ -78,6 +78,13 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    suspend fun resolveFileName(pkg: OtaPackage): String? {
+        val link = if (pkg.url.contains("/downloadCheck", ignoreCase = true)) {
+            (ServiceLocator.linkResolver.resolve(pkg.url) as? LinkStatus.Live)?.finalUrl
+        } else pkg.url
+        return link?.substringBefore('?')?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+    }
+
     init { DownloadCenter.restore(store) }
 
     fun setRegion(id: Int?) { regionId = id }
