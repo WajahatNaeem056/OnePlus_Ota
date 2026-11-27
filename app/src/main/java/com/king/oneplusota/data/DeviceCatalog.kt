@@ -13,6 +13,10 @@ import java.io.File
 data class CatalogVariant(val region: String, val productModel: String, val productName: String?, val letter: String) {
     val isChina: Boolean get() = region.equals("CN", true) || region.startsWith("Genshin", true)
     val regionId: Int get() = if (isChina) 1 else when (region.uppercase()) { "IN" -> 2; "EU" -> 3; else -> 0 }
+    /** Short tag shown in the list, e.g. "EU", "IN", "GLO", "CN". */
+    val code: String get() = if (region.startsWith("Genshin", true)) "CN Genshin" else region.uppercase()
+    /** Model number shown under the name, e.g. CPH2645EEA. */
+    val modelShown: String get() = productName ?: productModel
     val label: String get() = when (region.uppercase()) { "GLO" -> "Global / NA"; "EU" -> "EU"; "IN" -> "India"; "CN" -> "China"; else -> region }
 
     /** Same shape OTA Pulse sends for catalog devices: an "old" build, so the server answers with the newest. */

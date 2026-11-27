@@ -158,29 +158,30 @@ fun OtherTab(vm: OtaViewModel) {
                 }
             }
             val q = vm.query.trim().lowercase()
-            val list = vm.catalog.filter { q.isEmpty() || it.name.lowercase().contains(q) || it.variants.any { v -> v.productModel.lowercase().contains(q) } }
-            items(list) { d ->
-                Card(Modifier.fillMaxWidth().clickable { vm.select(d) }) {
+            val order = listOf("GLO", "IN", "EU", "CN")
+            // One row per device AND region, like Oxygen Updater's picker.
+            val rows = vm.catalog.flatMap { d -> d.variants.sortedBy { v -> order.indexOf(v.region.uppercase()).let { if (it < 0) 99 else it } }.map { v -> d to v } }
+                .filter { (d, v) ->
+                    q.isEmpty() || "${d.name} ${v.code} ${v.label} ${v.productModel} ${v.productName.orEmpty()}".lowercase().contains(q)
+                }
+            items(rows) { (d, v) ->
+                Card(Modifier.fillMaxWidth().clickable { vm.pick(d, v) }) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(d.name, style = MaterialTheme.typography.titleMedium)
-                        Text(d.variants.joinToString(" · ") { it.label } + " · ${d.android}", style = MaterialTheme.typography.bodySmall)
+                        Text("${d.name} (${v.code})", style = MaterialTheme.typography.titleMedium)
+                        Text("${v.modelShown} · ${d.android}", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
-            if (!vm.catalogLoading && vm.catalogError == null && list.isEmpty()) item { Text("No devices found") }
+            if (!vm.catalogLoading && vm.catalogError == null && rows.isEmpty()) item { Text("No devices found") }
         } else {
-            item { OutlinedButton(onClick = { vm.select(null) }) { Text("← Device list") } }
+            item { OutlinedButton(onClick = { vm.select(null) }) { Text("← Back to list") } }
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(sel.name, style = MaterialTheme.typography.titleMedium)
-                        Text("Select region", style = MaterialTheme.typography.labelMedium)
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            sel.variants.forEach { v ->
-                                FilterChip(selected = vm.variant == v, onClick = { vm.selectVariant(v) }, label = { Text(v.label) })
-                            }
+                        vm.variant?.let { v ->
+                            Text("${sel.name} (${v.code})", style = MaterialTheme.typography.titleMedium)
+                            Text("Model ${v.modelShown} · Region: ${v.label} · ${sel.android}", style = MaterialTheme.typography.bodySmall)
                         }
-                        vm.variant?.let { Text("Model ${it.productName ?: it.productModel}", style = MaterialTheme.typography.bodySmall) }
                         FullOnlyRow(vm)
                     }
                 }

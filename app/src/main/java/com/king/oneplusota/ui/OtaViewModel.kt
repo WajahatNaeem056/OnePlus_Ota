@@ -117,6 +117,9 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
         selected = d; variant = d?.variants?.firstOrNull(); otherCheck = CheckUi.Idle
     }
 
+    /** Opens one exact device + region page. */
+    fun pick(d: CatalogDevice, v: CatalogVariant) { selected = d; variant = v; otherCheck = CheckUi.Idle; message = null }
+
     fun selectVariant(v: CatalogVariant) { variant = v; otherCheck = CheckUi.Idle }
 
     val otherSpec: DeviceInfo?
