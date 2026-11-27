@@ -57,6 +57,7 @@ import com.wajahatnaeem.oneplusota.data.LinkStatus
 import androidx.compose.ui.unit.dp
 import com.wajahatnaeem.oneplusota.data.CheckResult
 import com.wajahatnaeem.oneplusota.data.OtaPackage
+import com.wajahatnaeem.oneplusota.data.SourceType
 import com.wajahatnaeem.oneplusota.device.DeviceInfo
 import com.wajahatnaeem.oneplusota.download.DlState
 
@@ -93,8 +94,8 @@ fun UpdateTab(vm: OtaViewModel) {
                             Chip("Region ${regionName(vm.device.regionId)}")
                         }
                         Column {
-                            Text("Your build", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(vm.device.otaVersion.ifBlank { "unknown" }, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                            Text("Current version", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(vm.device.displayVersion.ifBlank { "unknown" }, fontFamily = FontFamily.Monospace, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
@@ -162,7 +163,7 @@ fun OtherTab(vm: OtaViewModel) {
             }
             val q = vm.query.trim().lowercase()
             val order = listOf("GLO", "IN", "EU", "CN")
-            // One row per device AND region, like Oxygen Updater's picker.
+            // One row per device AND region.
             val rows = vm.catalog.flatMap { d -> d.variants.sortedBy { v -> order.indexOf(v.region.uppercase()).let { if (it < 0) 99 else it } }.map { v -> d to v } }
                 .filter { (d, v) ->
                     q.isEmpty() || "${d.name} ${v.code} ${v.label} ${v.productModel} ${v.productName.orEmpty()}".lowercase().contains(q)
@@ -275,7 +276,7 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, onDownlo
                         Row(Modifier.padding(vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Chip(fmt(r.pkg.sizeBytes))
                             Chip(if (r.pkg.isFull) "Full" else "Incremental")
-                            Chip(if (r.pkg.md5 != null) "MD5 available" else "MD5 n/a")
+                            Chip(if (r.pkg.source == SourceType.OXYGEN_UPDATER) "Backup" else "Official")
                         }
                         Button(onClick = { onDownload(r.pkg) }, shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
                             Icon(AppIcons.Download, null, Modifier.size(22.dp)); Spacer(Modifier.width(8.dp))

@@ -10,7 +10,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Fallback: community Oxygen Updater API (endpoints taken from the Oxygen Updater APK, v2.10).
+ * Fallback: community API (v2.10).
  *   GET devices/{filter}
  *   GET updateMethods/{deviceId}
  *   GET mostRecentUpdateData/{deviceId}/{updateMethodId}

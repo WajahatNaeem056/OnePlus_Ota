@@ -1,7 +1,7 @@
 package com.wajahatnaeem.oneplusota.data
 
 /**
- * Oplus OTA gateways (update/v3). URLs + RSA public keys taken from the OTA Pulse APK.
+ * Oplus OTA gateways (update/v3). URLs + RSA public keys.
  * id: 0 = Global(SG), 1 = China, 2 = India, 3 = Europe
  */
 object OplusServers {

@@ -25,6 +25,7 @@ data class DeviceInfo(
     val osVersion: String,
     val fingerprint: String,
     val regionId: Int,
+    val displayVersion: String = "",
 ) {
     val isOnePlus: Boolean
         get() = manufacturer.equals("OnePlus", true) || Build.BRAND.equals("OnePlus", true)
@@ -33,12 +34,14 @@ data class DeviceInfo(
         .put("product", product).put("marketName", marketName).put("otaVersion", otaVersion)
         .put("androidRelease", androidRelease).put("osVersion", osVersion)
         .put("fingerprint", fingerprint).put("regionId", regionId)
+        .put("displayVersion", displayVersion)
 
     companion object {
         fun fromJson(o: JSONObject) = DeviceInfo(
             o.optString("manufacturer"), o.optString("model"), o.optString("product"),
             o.optString("marketName"), o.optString("otaVersion"), o.optString("androidRelease"),
             o.optString("osVersion"), o.optString("fingerprint"), o.optInt("regionId", 0),
+            o.optString("displayVersion"),
         )
     }
 }
@@ -69,6 +72,7 @@ object DeviceReader {
             osVersion = SysProps.get("ro.build.version.oplusrom", ""),
             fingerprint = Build.FINGERPRINT,
             regionId = region,
+            displayVersion = SysProps.get("ro.build.display.id").ifBlank { SysProps.get("ro.build.display.ota") }.ifBlank { Build.DISPLAY },
         )
     }
 }

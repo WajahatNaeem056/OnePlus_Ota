@@ -13,7 +13,7 @@ import org.json.JSONObject
 import java.security.MessageDigest
 
 /**
- * Talks to OnePlus/Oplus OTA servers directly (same protocol OTA Pulse / OTA Multi Tools use).
+ * Talks to OnePlus/Oplus OTA servers directly.
  * NOTE: ported from decompiled code and NOT yet verified against a live response on a real device.
  * The raw decrypted JSON is kept in [lastRawJson] so field names can be calibrated quickly.
  */
@@ -29,12 +29,19 @@ class OplusClient(private val http: OkHttpClient) {
         val now = System.currentTimeMillis()
         val prefix = otaVersion.split("_").take(2).joinToString("_")
         val deviceId = sha256Hex("0") // no IMEI access on purpose; server accepts the placeholder
+        val regionCode = when (dev.regionId) { 1 -> "CN"; 2 -> "IN"; 3 -> "EU"; else -> "GL" }
+        val rui = Regex("(\\d+)").find(dev.osVersion)?.value?.toIntOrNull()?.takeIf { it > 0 } ?: dev.androidRelease.toIntOrNull()
+        val (androidVer, colorVer) = when {
+            rui == null || rui < 11 -> "unknown" to "unknown"
+            rui >= 17 -> "Android $rui" to "ColorOS $rui.0"
+            else -> "Android$rui.0" to "ColorOS$rui"
+        }
 
         val body = JSONObject()
             .put("language", "en-EN").put("romVersion", prefix).put("otaVersion", otaVersion)
-            .put("androidVersion", "unknown").put("colorOSVersion", "unknown")
+            .put("androidVersion", androidVer).put("colorOSVersion", colorVer)
             .put("model", dev.model).put("productName", dev.model)
-            .put("operator", "unknown").put("uRegion", "unknown").put("trackRegion", "unknown")
+            .put("operator", "unknown").put("uRegion", regionCode).put("trackRegion", regionCode)
             .put("imei", "000000000000000").put("imei1", "000000000000000")
             .put("mode", "0").put("registrationId", "unknown").put("deviceId", deviceId)
             .put("version", "3").put("type", "1").put("otaPrefix", prefix)
@@ -45,11 +52,11 @@ class OplusClient(private val http: OkHttpClient) {
         val req = Request.Builder().url(server.url)
             .post(OplusCrypto.encryptBody(body.toString(), session).toRequestBody("application/json".toMediaType()))
             .header("language", "en-EN").header("romVersion", prefix).header("otaVersion", otaVersion)
-            .header("androidVersion", "unknown").header("colorOSVersion", "unknown").header("model", dev.model)
+            .header("androidVersion", androidVer).header("colorOSVersion", colorVer).header("model", dev.model)
             .header("infVersion", "1").header("operator", "unknown").header("nvCarrier", nvCarrier(server.id))
-            .header("uRegion", "unknown").header("trackRegion", "unknown")
+            .header("uRegion", regionCode).header("trackRegion", regionCode)
             .header("imei", "000000000000000").header("imei1", "000000000000000")
-            .header("deviceId", deviceId).header("mode", "manual").header("channel", "pc")
+            .header("deviceId", deviceId).header("mode", "client_auto").header("channel", "pc")
             .header("version", "2").header("Accept", "application/json")
             .header("User-Agent", "NULL")
             .header("protectedKey", OplusCrypto.protectedKeyHeader(session, server, now))

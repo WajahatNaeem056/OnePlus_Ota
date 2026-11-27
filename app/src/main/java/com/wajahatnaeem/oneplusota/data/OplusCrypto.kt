@@ -10,7 +10,7 @@ import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * v2 request protocol (ported from OTA Pulse):
+ * v2 request protocol:
  *  - body JSON encrypted with random AES-256-CTR key + 16 byte IV
  *  - Base64(key) (as UTF-8 text) encrypted with server RSA public key, RSA/ECB/OAEPWithSHA-1AndMGF1Padding
  *  - sent in the "protectedKey" header; response is {cipher, iv} decrypted with the same AES key

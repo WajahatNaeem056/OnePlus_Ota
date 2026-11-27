@@ -26,7 +26,7 @@ object ServiceLocator {
         com.wajahatnaeem.oneplusota.data.DeviceCatalog(http)
     }
 
-    /** Order: 1) auto-detect on OnePlus server  2) Oxygen Updater  3) other OnePlus gateways. */
+    /** Order: 1) auto-detect on OnePlus server  2) backup source  3) other OnePlus gateways. */
     val chain: SourceChain by lazy {
         SourceChain(
             listOf(

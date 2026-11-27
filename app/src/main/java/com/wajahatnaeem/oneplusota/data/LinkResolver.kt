@@ -17,7 +17,7 @@ sealed interface LinkStatus {
 
 /**
  * Turns the URL we got from a source into a link that works in ANY downloader.
- *  - OnePlus "/downloadCheck" URLs only answer with special headers (taken from OTA Pulse) and then redirect
+ *  - OnePlus "/downloadCheck" URLs only answer with special headers and then redirect
  *    to the real CDN URL. We follow those redirects by hand, with those headers only on that hop.
  *  - The final URL is then requested like a generic browser would (no special headers). If that works,
  *    the copied link works in a browser, 1DM, ADM or IDM at this moment.

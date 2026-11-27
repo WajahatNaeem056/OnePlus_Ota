@@ -19,7 +19,7 @@ data class CatalogVariant(val region: String, val productModel: String, val prod
     val modelShown: String get() = productName ?: productModel
     val label: String get() = when (region.uppercase()) { "GLO" -> "Global / NA"; "EU" -> "EU"; "IN" -> "India"; "CN" -> "China"; else -> region }
 
-    /** Same shape OTA Pulse sends for catalog devices: an "old" build, so the server answers with the newest. */
+    /** An "old" build for catalog devices, so the server answers with the newest. */
     val otaVersion: String get() = "${productName ?: productModel}_11.$letter.01_0001_100001010000"
 
     fun toDeviceInfo(marketName: String) = DeviceInfo(
@@ -32,7 +32,7 @@ data class CatalogVariant(val region: String, val productModel: String, val prod
 data class CatalogDevice(val name: String, val android: String, val variants: List<CatalogVariant>)
 
 /**
- * Device list = OTA Pulse's community catalog (devices/oneplus.json on GitHub), fetched at runtime and cached.
+ * Device list = community catalog (devices/oneplus.json on GitHub), fetched at runtime and cached.
  * The catalog has no separate "NA" entry: North-America units are served as Global.
  */
 class DeviceCatalog(private val http: OkHttpClient) {
