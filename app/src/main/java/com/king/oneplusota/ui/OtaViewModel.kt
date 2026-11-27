@@ -75,7 +75,7 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
             val cache = File(app.filesDir, "oneplus_catalog.json")
             ServiceLocator.catalog.load(cache)
                 .onSuccess { catalog = it }
-                .onFailure { catalogError = "Device list load nahi hui (${it.message}). Internet check karke dobara try karo." }
+                .onFailure { catalogError = "Couldn't load the device list (${it.message}). Check your connection and try again." }
             catalogLoading = false
         }
     }
@@ -125,9 +125,9 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun copyRawResponse() {
         val raw = ServiceLocator.oplusClient.lastRawJson
-        if (raw == null) { message = "Abhi koi raw OnePlus response nahi hai"; return }
+        if (raw == null) { message = "No raw OnePlus response yet"; return }
         app.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("oplus-raw", raw))
-        message = "Raw JSON copy ho gaya"
+        message = "Raw JSON copied"
     }
 
     /** Copies the finished zip into public Downloads so the system updater's "local install" picker can see it. */
@@ -143,7 +143,7 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
                     }
                     val uri = app.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)!!
                     app.contentResolver.openOutputStream(uri)!!.use { out -> f.inputStream().use { it.copyTo(out, 1 shl 16) } }
-                    "Downloads folder mein save ho gaya: ${f.name}"
+                    "Saved to Downloads: ${f.name}"
                 }.getOrElse { "Export fail: ${it.message}" }
             }
         }

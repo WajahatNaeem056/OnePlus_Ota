@@ -143,7 +143,7 @@ class OplusDirectSource(private val client: OplusClient) : OtaSource {
     override val type = SourceType.OPLUS_DIRECT
 
     override suspend fun fetch(dev: DeviceInfo, fullOnly: Boolean): SourceOutcome = withContext(Dispatchers.IO) {
-        if (dev.otaVersion.isBlank()) return@withContext SourceOutcome.Error("ro.build.version.ota padh nahi paya")
+        if (dev.otaVersion.isBlank()) return@withContext SourceOutcome.Error("Couldn't read ro.build.version.ota")
         val server = OplusServers.byId(dev.regionId)
         resolve(client, dev, listOf(server), fullOnly, type)
     }
@@ -174,7 +174,7 @@ private fun resolve(
                 pkg = client.parse(client.query(dev, server, baselineOtaVersion(dev.otaVersion)), type)
             }
             if (pkg == null) { errors += "${server.name}: no package in response"; continue }
-            if (fullOnly && !pkg.isFull) { errors += "${server.name}: sirf incremental mila, full nahi"; continue }
+            if (fullOnly && !pkg.isFull) { errors += "${server.name}: only an incremental package was found, no full package"; continue }
             return SourceOutcome.Found(pkg)
         } catch (e: Exception) {
             errors += "${server.name}: ${e.message}"

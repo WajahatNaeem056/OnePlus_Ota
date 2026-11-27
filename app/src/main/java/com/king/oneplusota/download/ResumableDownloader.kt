@@ -73,9 +73,9 @@ class ResumableDownloader(private val http: OkHttpClient, private val net: Netwo
             try {
                 if (attempt(job, part, onProgress)) return RunResult.Completed
             } catch (e: ExpiredLink) {
-                if (refreshes >= 2) return RunResult.GaveUp("Link expire/reject (HTTP ${e.code}). 'Check' dobara dabao, phir Retry.")
-                onProgress(before, job.total, 0, "Link expire hua, naya link la raha hoon…")
-                val fresh = refresh() ?: return RunResult.GaveUp("Naya link nahi mila (HTTP ${e.code}). Thodi der baad Retry karo.")
+                if (refreshes >= 2) return RunResult.GaveUp("Link expired or was rejected (HTTP ${e.code}). Check for the update again, then tap Retry.")
+                onProgress(before, job.total, 0, "Link expired, fetching a new one…")
+                val fresh = refresh() ?: return RunResult.GaveUp("Couldn't get a new link (HTTP ${e.code}). Try again later.")
                 val sameFile = (job.pkg.sizeBytes <= 0 || fresh.sizeBytes <= 0 || job.pkg.sizeBytes == fresh.sizeBytes) &&
                     (job.pkg.md5 == null || fresh.md5 == null || job.pkg.md5.equals(fresh.md5, true))
                 if (!sameFile) { part.delete(); job.etag = null; job.lastModified = null }  // genuinely a different build
@@ -89,7 +89,7 @@ class ResumableDownloader(private val http: OkHttpClient, private val net: Netwo
                 val progressed = (if (part.exists()) part.length() else 0L) > before
                 failures = if (progressed) 1 else failures + 1
                 if (failures > MAX_AUTO_RETRIES) {
-                    return RunResult.GaveUp("Network error: ${e.message}. Progress safe hai — Retry dabao.")
+                    return RunResult.GaveUp("Network error: ${e.message}. Your progress is saved. Tap Retry.")
                 }
                 val have = if (part.exists()) part.length() else 0L
                 onProgress(have, job.total, 0, "Network error — retry $failures/$MAX_AUTO_RETRIES")
@@ -122,11 +122,11 @@ class ResumableDownloader(private val http: OkHttpClient, private val net: Netwo
                         206 -> {
                             val cr = resp.header("Content-Range").orEmpty() // bytes START-END/TOTAL
                             val start = cr.substringAfter("bytes ", "").substringBefore('-').toLongOrNull()
-                            if (start != null && start != have) { part.delete(); throw IOException("server ne galat offset diya, restart") }
+                            if (start != null && start != have) { part.delete(); throw IOException("server returned a wrong offset, restarting") }
                             cr.substringAfterLast('/', "").toLongOrNull()?.let { job.total = it }
                         }
                         200 -> {
-                            if (have > 0) { part.delete(); have = 0L; note = "Server ne resume nahi diya — shuru se (file badal gayi ya Range unsupported)" }
+                            if (have > 0) { part.delete(); have = 0L; note = "Server didn't allow resuming, restarting from the beginning (file changed or Range unsupported)" }
                             val len = resp.body?.contentLength() ?: -1L
                             if (len > 0) job.total = len
                             job.etag = resp.header("ETag"); job.lastModified = resp.header("Last-Modified")
@@ -164,7 +164,7 @@ class ResumableDownloader(private val http: OkHttpClient, private val net: Netwo
             } finally { handle.dispose() }
 
             val size = part.length()
-            if (job.total > 0 && size < job.total) throw IOException("connection beech mein band ($size/${job.total})")
+            if (job.total > 0 && size < job.total) throw IOException("connection closed early ($size/${job.total})")
             true
         }
 

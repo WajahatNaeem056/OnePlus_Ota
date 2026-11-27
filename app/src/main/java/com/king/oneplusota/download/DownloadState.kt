@@ -67,7 +67,7 @@ object DownloadCenter {
         val fin = store.finalFile(job.pkg)
         _state.value = when {
             fin.exists() -> DlState.Done(job.pkg, fin.absolutePath, null)
-            else -> DlState.Paused(job.pkg, done, job.total, "App band hone ke baad bhi progress safe hai")
+            else -> DlState.Paused(job.pkg, done, job.total, "Progress is saved, even after the app was closed")
         }
     }
 }

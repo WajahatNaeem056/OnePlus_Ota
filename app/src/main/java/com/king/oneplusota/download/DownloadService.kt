@@ -42,7 +42,7 @@ class DownloadService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_PAUSE -> pause("Tumne pause kiya")
+            ACTION_PAUSE -> pause("Paused by you")
             ACTION_CANCEL -> cancel()
             ACTION_START, ACTION_RESUME -> begin()
             // null intent = Android restarted us after killing the process
@@ -90,19 +90,19 @@ class DownloadService : Service() {
         val pkg = job.pkg
         val part = store.partFile(pkg); val fin = store.finalFile(pkg)
         DownloadCenter.set(DlState.Verifying(pkg))
-        notify(buildNotif(pkg, job.total, job.total, "MD5 verify ho raha hai…", true))
+        notify(buildNotif(pkg, job.total, job.total, "Verifying MD5…", true))
         fin.delete(); part.renameTo(fin)
         val ok: Boolean? = pkg.md5?.let { ResumableDownloader.md5Of(fin).equals(it, ignoreCase = true) }
         store.active = false
         if (ok == false) {
             // Corrupt: resuming can't fix it, so this is the one case where we discard the file.
             fin.delete(); store.clear()
-            DownloadCenter.set(DlState.Failed(pkg, 0, job.total, "MD5 match nahi hua — file corrupt thi, dobara download karo"))
+            DownloadCenter.set(DlState.Failed(pkg, 0, job.total, "MD5 mismatch: the file was corrupt, please download it again"))
         } else {
             DownloadCenter.set(DlState.Done(pkg, fin.absolutePath, ok))
         }
         stopForeground(STOP_FOREGROUND_DETACH)
-        notify(buildNotif(pkg, job.total, job.total, if (ok == false) "Verify fail" else "Download complete ✓", false))
+        notify(buildNotif(pkg, job.total, job.total, if (ok == false) "Verification failed" else "Download complete ✓", false))
         stopSelf()
     }
 
@@ -125,7 +125,7 @@ class DownloadService : Service() {
     }
 
     /** Android 15 limits dataSync foreground services to ~6h; pause cleanly so progress stays resumable. */
-    override fun onTimeout(startId: Int, fgsType: Int) { pause("Android ne service time-limit laga di — Resume dabao") }
+    override fun onTimeout(startId: Int, fgsType: Int) { pause("Android's background time limit was reached. Tap Resume.") }
 
     override fun onDestroy() { scope.cancel(); super.onDestroy() }
 

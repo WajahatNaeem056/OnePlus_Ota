@@ -68,7 +68,7 @@ fun UpdateTab(vm: OtaViewModel) {
         if (!vm.device.isOnePlus) {
             item {
                 Card(Modifier.fillMaxWidth()) {
-                    Text("Ye app sirf OnePlus devices ke liye hai. Is device ka manufacturer: ${vm.device.manufacturer}",
+                    Text("This app only works on OnePlus devices. Detected manufacturer: ${vm.device.manufacturer}",
                         Modifier.padding(16.dp))
                 }
             }
@@ -114,7 +114,7 @@ private fun regionName(id: Int) = when (id) { 1 -> "CN"; 2 -> "IN"; 3 -> "EU"; e
 private fun FullOnlyRow(vm: OtaViewModel) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Switch(checked = vm.fullOnly, onCheckedChange = { vm.fullOnly = it })
-        Text("Sirf Full OTA (bada package)")
+        Text("Full OTA only")
     }
 }
 
@@ -159,14 +159,14 @@ fun OtherTab(vm: OtaViewModel) {
                     }
                 }
             }
-            if (!vm.catalogLoading && vm.catalogError == null && list.isEmpty()) item { Text("Koi device nahi mila") }
+            if (!vm.catalogLoading && vm.catalogError == null && list.isEmpty()) item { Text("No devices found") }
         } else {
             item { OutlinedButton(onClick = { vm.select(null) }) { Text("← Device list") } }
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(sel.name, style = MaterialTheme.typography.titleMedium)
-                        Text("Region / version chuno", style = MaterialTheme.typography.labelMedium)
+                        Text("Select region", style = MaterialTheme.typography.labelMedium)
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             sel.variants.forEach { v ->
                                 FilterChip(selected = vm.variant == v, onClick = { vm.selectVariant(v) }, label = { Text(v.label) })
@@ -193,6 +193,9 @@ fun OtherTab(vm: OtaViewModel) {
 // =================================================================================================
 // Shared cards
 // =================================================================================================
+/** Removes markdown heading marks (##) that some changelogs contain. */
+private fun cleanChangelog(s: String) = s.lines().joinToString("\n") { it.trimStart('#').trim() }
+
 /** Long text collapsed to a few lines with a Show more / Show less toggle. */
 @Composable
 private fun Expandable(text: String, collapsedLines: Int = 5) {
@@ -225,18 +228,18 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, onDownload: (OtaPackage)
                     Text("${fmt(r.pkg.sizeBytes)} · ${if (r.pkg.isFull) "FULL" else "incremental"} · MD5 ${if (r.pkg.md5 != null) "available" else "n/a"}")
                     Text("Source: ${r.pkg.source.label}", style = MaterialTheme.typography.bodySmall)
                     Button(onClick = { onDownload(r.pkg) }, modifier = Modifier.fillMaxWidth()) { Text("Download") }
-                    if (r.notes.isNotEmpty()) Collapsible("Source log (pehle sources ka result)", r.notes.joinToString("\n") { "• $it" })
-                    r.pkg.changelog?.let { Expandable(it) }
+                    if (r.notes.isNotEmpty()) Collapsible("Source log", r.notes.joinToString("\n") { "• $it" })
+                    r.pkg.changelog?.let { Expandable(cleanChangelog(it)) }
                 }
             }
             is CheckResult.NoPackage, is CheckResult.Failed -> {
                 val notes = if (r is CheckResult.NoPackage) r.notes else (r as CheckResult.Failed).notes
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(if (r is CheckResult.NoPackage) "Koi full package nahi mila" else "Sab sources fail hue",
+                        Text(if (r is CheckResult.NoPackage) "No full package found" else "All sources failed",
                             style = MaterialTheme.typography.titleMedium)
                         notes.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
-                        OutlinedButton(onClick = vm::copyRawResponse) { Text("Raw server response copy karo") }
+                        OutlinedButton(onClick = vm::copyRawResponse) { Text("Copy raw server response") }
                     }
                 }
             }
@@ -273,21 +276,21 @@ private fun DownloadCard(vm: OtaViewModel, s: DlState) {
                     Text(s.pkg.fileName, style = MaterialTheme.typography.titleSmall)
                     if (s.done > 0) Progress(s.done, s.total)
                     Text(s.message, color = MaterialTheme.colorScheme.error)
-                    if (s.done > 0) Text("${fmt(s.done)} safe hai — Retry wahin se continue karega.")
+                    if (s.done > 0) Text("${fmt(s.done)} is saved. Retry continues from there.")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { if (s.done > 0) vm.resume() else vm.restart(s.pkg) }) { Text("Retry") }
                         OutlinedButton(onClick = vm::cancel) { Text("Cancel") }
                     }
                 }
                 is DlState.Verifying -> {
-                    Text("MD5 verify ho raha hai…")
+                    Text("Verifying MD5…")
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
                 is DlState.Done -> {
                     Text("Download complete ✓", style = MaterialTheme.typography.titleSmall)
-                    Text(when (s.md5Ok) { true -> "MD5 verified"; false -> "MD5 mismatch"; null -> "MD5 available nahi tha" })
+                    Text(when (s.md5Ok) { true -> "MD5 verified"; false -> "MD5 mismatch"; null -> "No MD5 available" })
                     Text(s.path, style = MaterialTheme.typography.bodySmall)
-                    Button(onClick = { vm.exportToDownloads(s.path) }) { Text("Downloads folder mein save karo") }
+                    Button(onClick = { vm.exportToDownloads(s.path) }) { Text("Save to Downloads") }
                 }
                 DlState.Idle -> {}
             }
