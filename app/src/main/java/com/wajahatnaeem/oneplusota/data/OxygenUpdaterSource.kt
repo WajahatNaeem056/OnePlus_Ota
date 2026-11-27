@@ -50,7 +50,7 @@ class OxygenUpdaterSource(private val http: OkHttpClient) : OtaSource {
             val values = strings(d).flatMap { it.split(',') }.map { it.trim().lowercase() }
             if (wanted.any { it in values }) { deviceId = d.optLong("id", -1L); break }
         }
-        if (deviceId < 0) return@withContext SourceOutcome.NoUpdate("Device not found in the Oxygen Updater list (${dev.model})")
+        if (deviceId < 0) return@withContext SourceOutcome.NoUpdate("Device not found on the backup server (${dev.model})")
 
         val methods = JSONArray(get("updateMethods/$deviceId", "language" to "en"))
         var methodId = -1L
@@ -63,13 +63,13 @@ class OxygenUpdaterSource(private val http: OkHttpClient) : OtaSource {
             if (isFull) { methodId = m.optLong("id", -1L); break }
         }
         if (methodId < 0) {
-            if (fullOnly) return@withContext SourceOutcome.NoUpdate("Oxygen Updater has no full update method for this device")
+            if (fullOnly) return@withContext SourceOutcome.NoUpdate("Backup server has no full update method for this device")
             methodId = fallbackId
         }
 
         val u = JSONObject(get("mostRecentUpdateData/$deviceId/$methodId"))
         val url = u.optString("download_url")
-        if (url.isBlank()) return@withContext SourceOutcome.NoUpdate("Oxygen Updater returned no download URL")
+        if (url.isBlank()) return@withContext SourceOutcome.NoUpdate("Backup server returned no download URL")
         val size = u.optLong("download_size", 0L)
         SourceOutcome.Found(
             OtaPackage(

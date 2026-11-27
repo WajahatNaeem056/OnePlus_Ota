@@ -26,6 +26,7 @@ data class DeviceInfo(
     val fingerprint: String,
     val regionId: Int,
     val displayVersion: String = "",
+    val reqMode: String = "manual",
 ) {
     val isOnePlus: Boolean
         get() = manufacturer.equals("OnePlus", true) || Build.BRAND.equals("OnePlus", true)
@@ -34,7 +35,7 @@ data class DeviceInfo(
         .put("product", product).put("marketName", marketName).put("otaVersion", otaVersion)
         .put("androidRelease", androidRelease).put("osVersion", osVersion)
         .put("fingerprint", fingerprint).put("regionId", regionId)
-        .put("displayVersion", displayVersion)
+        .put("displayVersion", displayVersion).put("reqMode", reqMode)
 
     companion object {
         fun fromJson(o: JSONObject) = DeviceInfo(
@@ -42,6 +43,7 @@ data class DeviceInfo(
             o.optString("marketName"), o.optString("otaVersion"), o.optString("androidRelease"),
             o.optString("osVersion"), o.optString("fingerprint"), o.optInt("regionId", 0),
             o.optString("displayVersion"),
+            o.optString("reqMode").ifBlank { "manual" },
         )
     }
 }

@@ -4,7 +4,7 @@ import org.json.JSONObject
 
 enum class SourceType(val label: String) {
     OPLUS_DIRECT("OnePlus Server"),
-    OXYGEN_UPDATER("Oxygen Updater"),
+    OXYGEN_UPDATER("Backup server"),
     OPLUS_GATEWAYS("OnePlus Gateway"),
 }
 

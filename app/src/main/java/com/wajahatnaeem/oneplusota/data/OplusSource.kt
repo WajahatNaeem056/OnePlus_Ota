@@ -46,7 +46,7 @@ class OplusClient(private val http: OkHttpClient) {
             .put("mode", "0").put("registrationId", "unknown").put("deviceId", deviceId)
             .put("version", "3").put("type", "1").put("otaPrefix", prefix)
             .put("isRealme", "0").put("time", now.toString())
-            .put("canCheckSelf", "0").put("gray", "0").put("reqMode", "manual")
+            .put("canCheckSelf", "0").put("gray", "0").put("reqMode", dev.reqMode)
 
         val session = OplusCrypto.newSession()
         val req = Request.Builder().url(server.url)
@@ -56,7 +56,7 @@ class OplusClient(private val http: OkHttpClient) {
             .header("infVersion", "1").header("operator", "unknown").header("nvCarrier", nvCarrier(server.id))
             .header("uRegion", regionCode).header("trackRegion", regionCode)
             .header("imei", "000000000000000").header("imei1", "000000000000000")
-            .header("deviceId", deviceId).header("mode", "manual").header("channel", "pc")
+            .header("deviceId", deviceId).header("mode", dev.reqMode).header("channel", "pc")
             .header("version", "2").header("Accept", "application/json")
             .header("User-Agent", "NULL")
             .header("protectedKey", OplusCrypto.protectedKeyHeader(session, server, now))

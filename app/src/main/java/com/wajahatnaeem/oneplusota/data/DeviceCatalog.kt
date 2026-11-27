@@ -10,7 +10,7 @@ import org.json.JSONObject
 import java.io.File
 
 /** One region build of a device (e.g. 13R / EU / CPH2645EEA). */
-data class CatalogVariant(val region: String, val productModel: String, val productName: String?, val letter: String) {
+data class CatalogVariant(val region: String, val productModel: String, val productName: String?, val letter: String, val reqMode: String = "manual") {
     val isChina: Boolean get() = region.equals("CN", true) || region.startsWith("Genshin", true)
     val regionId: Int get() = if (isChina) 1 else when (region.uppercase()) { "IN" -> 2; "EU" -> 3; else -> 0 }
     /** Short tag shown in the list, e.g. "EU", "IN", "GLO", "CN". */
@@ -26,7 +26,7 @@ data class CatalogVariant(val region: String, val productModel: String, val prod
         manufacturer = "OnePlus", model = productModel, product = productName ?: productModel,
         marketName = marketName, otaVersion = otaVersion,
         androidRelease = Regex("\\d+").find(generation)?.value.orEmpty(), osVersion = "",
-        fingerprint = "", regionId = regionId,
+        fingerprint = "", regionId = regionId, reqMode = reqMode,
     )
 }
 
@@ -86,6 +86,7 @@ class DeviceCatalog(private val http: OkHttpClient) {
                     region = o.optString("displayName", "GLO"), productModel = model,
                     productName = o.optString("productName").ifBlank { null },
                     letter = o.optString("versionLetter").ifBlank { groupLetter ?: "A" },
+                    reqMode = o.optString("reqMode").ifBlank { "manual" },
                 )
             }
             when (val g = groups.get(key)) {
