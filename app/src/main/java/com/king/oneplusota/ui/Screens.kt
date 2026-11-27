@@ -111,20 +111,12 @@ private fun DeviceCard(vm: OtaViewModel) {
                     FilterChip(selected = vm.regionId == id, onClick = { vm.setRegion(id) }, label = { Text(name) })
                 }
             }
-            FullOnlyRow(vm)
         }
     }
 }
 
 private fun regionName(id: Int) = when (id) { 1 -> "CN"; 2 -> "IN"; 3 -> "EU"; else -> "Global" }
 
-@Composable
-private fun FullOnlyRow(vm: OtaViewModel) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Switch(checked = vm.fullOnly, onCheckedChange = { vm.fullOnly = it })
-        Text("Full OTA only")
-    }
-}
 
 // =================================================================================================
 // Tab 2: Other (any OnePlus device)
@@ -182,7 +174,6 @@ fun OtherTab(vm: OtaViewModel) {
                             Text("${sel.name} (${v.code})", style = MaterialTheme.typography.titleMedium)
                             Text("Model ${v.modelShown} · Region: ${v.label} · ${sel.android}", style = MaterialTheme.typography.bodySmall)
                         }
-                        FullOnlyRow(vm)
                     }
                 }
             }

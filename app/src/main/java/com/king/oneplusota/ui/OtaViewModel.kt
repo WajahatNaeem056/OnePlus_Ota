@@ -42,7 +42,8 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
     /** null = auto-detect */
     var regionId by mutableStateOf<Int?>(null)
         private set
-    var fullOnly by mutableStateOf(true)
+    /** Only full OTA packages are ever shown (no toggle). */
+    val fullOnly = true
     var check by mutableStateOf<CheckUi>(CheckUi.Idle)
         private set
     var message by mutableStateOf<String?>(null)
