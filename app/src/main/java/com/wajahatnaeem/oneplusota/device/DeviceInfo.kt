@@ -54,6 +54,8 @@ data class DeviceInfo(
 }
 
 object DeviceReader {
+    private val CN_MODELS = setOf("PJE110YS", "PHK110YS", "PGKM10", "NE2210", "OPD2404", "OPD2413")
+
     fun read(): DeviceInfo {
         val regionMark = listOf(
             "ro.vendor.oplus.regionmark", "ro.oplus.regionmark", "persist.sys.oplus.region",
@@ -64,6 +66,7 @@ object DeviceReader {
             product.endsWith("EEA") -> 3
             product.endsWith("IN") -> 2
             Regex("^P[A-Z]{2}\\d{3}$").matches(Build.MODEL.uppercase()) -> 1
+            Build.MODEL.uppercase() in CN_MODELS || product in CN_MODELS -> 1
             regionMark.startsWith("CN") -> 1
             regionMark.startsWith("IN") -> 2
             regionMark.startsWith("EU") -> 3
