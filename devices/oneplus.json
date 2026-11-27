@@ -190,9 +190,6 @@
     ],
     "firmwareGroups": {
       "Android 15": "A",
-<<<<<<< ours
-      "Android 16": "F"
-=======
       "Android 16": "F",
       "Android 17": [
         {
@@ -213,7 +210,6 @@
           "versionLetter": "H"
         }
       ]
->>>>>>> theirs
     }
   },
   {
@@ -967,8 +963,4 @@
       "Android 15": "F"
     }
   }
-<<<<<<< ours
 ]
-=======
-]
->>>>>>> theirs

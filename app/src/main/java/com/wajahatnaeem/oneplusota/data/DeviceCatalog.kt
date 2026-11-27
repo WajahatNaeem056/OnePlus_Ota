@@ -19,38 +19,23 @@ data class CatalogVariant(val region: String, val productModel: String, val prod
     val modelShown: String get() = productName ?: productModel
     val label: String get() = when (region.uppercase()) { "GLO" -> "Global / NA"; "EU" -> "EU"; "IN" -> "India"; "CN" -> "China"; else -> region }
 
-<<<<<<< ours
-    /** Carrier/region tag the gateways expect for this region build. */
-    val nvId: String get() = when {
-=======
     /** Region tag used in the build string. */
     val nvTag: String get() = when {
->>>>>>> theirs
         region.startsWith("Genshin", true) -> "NV97"
         else -> when (region.uppercase()) { "GLO" -> "NVA7"; "CN" -> "NV97"; "IN" -> "NV1B"; "EU" -> "NV44"; else -> "" }
     }
 
-<<<<<<< ours
-    /** An "old" build for catalog devices, so the server answers with the newest. */
-    val otaVersion: String get() = "$productModel${nvId}_11.$letter.01_0001_100001010000"
-=======
     /** Same tag as the phones report it in ro.build.oplus_nv_id (8 binary digits, e.g. NV1B -> 00011011). */
     val nvId: String get() = nvTag.removePrefix("NV").toIntOrNull(16)?.let { Integer.toBinaryString(it).padStart(8, '0') }.orEmpty()
 
     /** An "old" build for catalog devices, so the server answers with the newest. */
     val otaVersion: String get() = "$productModel${nvTag}_11.$letter.01_0001_100001010000"
->>>>>>> theirs
 
     fun toDeviceInfo(marketName: String, generation: String = "") = DeviceInfo(
         manufacturer = "OnePlus", model = productModel, product = productName ?: productModel,
         marketName = marketName, otaVersion = otaVersion,
-<<<<<<< ours
-        androidRelease = Regex("\\d+").find(generation)?.value.orEmpty(), osVersion = "",
-        fingerprint = "", regionId = regionId, reqMode = reqMode, nvId = nvId,
-=======
         androidRelease = Regex("\\d+").find(gen.ifBlank { generation })?.value.orEmpty(), osVersion = "",
         fingerprint = "", regionId = regionId, reqMode = reqMode, nvId = nvId, probe = true,
->>>>>>> theirs
     )
 }
 

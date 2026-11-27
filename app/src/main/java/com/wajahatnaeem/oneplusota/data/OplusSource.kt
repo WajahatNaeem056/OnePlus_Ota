@@ -178,20 +178,19 @@ private val REGION_SUFFIXES = listOf("EEA", "IN", "RU", "TR", "CN", "EU", "TW", 
  * Asking with it makes the server answer with the newest FULL package even when the phone is already up to date.
  * Null when the build letter can't be read from the phone.
  */
-<<<<<<< ours
-internal fun syntheticOtaVersion(dev: DeviceInfo): String? {
-    val letterRx = Regex("_11[._]([A-Z])\\.", RegexOption.IGNORE_CASE)
-    val letter = listOf(dev.otaVersion, dev.displayVersion)
-=======
 internal fun syntheticOtaVersion(dev: DeviceInfo, letterOverride: String? = null): String? {
     val letterRx = Regex("_11[._]([A-Z])\\.", RegexOption.IGNORE_CASE)
     val letter = letterOverride ?: listOf(dev.otaVersion, dev.displayVersion)
->>>>>>> theirs
         .firstNotNullOfOrNull { letterRx.find(it)?.groupValues?.get(1)?.uppercase() } ?: return null
     var base = dev.model.substringBefore("_11").substringBefore(".")
     REGION_SUFFIXES.firstOrNull { base.endsWith(it, ignoreCase = true) }?.let { base = base.dropLast(it.length) }
     base = base.replace(Regex("NV[0-9A-Z]{2}$", RegexOption.IGNORE_CASE), "")
-    val nv = dev.nvId.trim().takeIf { it.length == 4 && it.startsWith("NV", ignoreCase = true) }?.uppercase().orEmpty()
+    val id = dev.nvId.trim()
+    val nv = when {
+        id.length == 4 && id.startsWith("NV", ignoreCase = true) -> id.uppercase()
+        id.length == 8 && id.all { it == '0' || it == '1' } -> "NV%02X".format(id.toInt(2))
+        else -> ""
+    }
     return "${base}${nv}_11.${letter}.01_0001_100001010000"
 }
 
@@ -220,7 +219,7 @@ private fun versionNums(v: String) =
     Regex("\\d+").findAll(v.substringAfter('_')).map { it.value.toLongOrNull() ?: 0L }.toList()
 
 /** Both strings come from the same OnePlus server, e.g. "CPH2645_17.0.0.105(EX01)" vs "CPH2645_16.0.10.600(EX01)". */
-private fun isNewerVersion(a: String, b: String): Boolean {
+internal fun isNewerVersion(a: String, b: String): Boolean {
     val x = versionNums(a); val y = versionNums(b)
     for (i in 0 until maxOf(x.size, y.size)) {
         val p = x.getOrElse(i) { 0L }; val q = y.getOrElse(i) { 0L }
@@ -234,27 +233,6 @@ private class Probe(val json: JSONObject?, val pkg: OtaPackage?, val desc: Strin
 private suspend fun resolve(
     client: OplusClient, dev: DeviceInfo, servers: List<OplusServers.Server>,
     fullOnly: Boolean, type: SourceType,
-<<<<<<< ours
-): SourceOutcome {
-    // Full-only: first ask as an old build (server hands out the newest full zip), then as the phone's real build.
-    val versions = listOfNotNull(if (fullOnly) syntheticOtaVersion(dev) else null, dev.otaVersion).distinct()
-    val errors = mutableListOf<String>()
-    var sawResponse = false
-    for (server in servers) {
-        var onlyIncremental = false
-        var lastDesc: String? = null
-        for (v in versions) {
-            try {
-                val json = client.query(dev, server, v)
-                sawResponse = true
-                val pkg = client.parse(json, type)
-                if (pkg == null) { lastDesc = client.describe(json); continue }
-                if (!fullOnly || pkg.isFull) return SourceOutcome.Found(pkg)
-                onlyIncremental = true
-            } catch (e: Exception) {
-                errors += "${server.name}: ${e.message}"
-            }
-=======
 ): SourceOutcome = coroutineScope {
     // Full-only: ask as old builds (server hands out the newest full zip) and as the phone's real build.
     // Catalog devices don't know their build letter, so every letter is tried and the newest full package wins.
@@ -293,10 +271,7 @@ private suspend fun resolve(
             val desc = probes.firstNotNullOfOrNull { it.desc }
             if (desc != null) errors += "${server.name}: no package ($desc)"
             probes.mapNotNull { it.err }.distinct().take(2).forEach { errors += "${server.name}: $it" }
->>>>>>> theirs
         }
-        if (onlyIncremental) errors += "${server.name}: only an incremental package was found, no full package"
-        else if (lastDesc != null) errors += "${server.name}: no package ($lastDesc)"
     }
     val msg = errors.joinToString("; ")
     if (sawResponse) SourceOutcome.NoUpdate(msg) else SourceOutcome.Error(msg)

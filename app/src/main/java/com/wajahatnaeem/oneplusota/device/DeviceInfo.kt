@@ -29,11 +29,8 @@ data class DeviceInfo(
     val reqMode: String = "manual",
     /** ro.build.oplus_nv_id (carrier/region tag). Blank = use the region default. */
     val nvId: String = "",
-<<<<<<< ours
-=======
     /** Catalog devices: try every build letter and keep the newest full package. */
     val probe: Boolean = false,
->>>>>>> theirs
 ) {
     val isOnePlus: Boolean
         get() = manufacturer.equals("OnePlus", true) || Build.BRAND.equals("OnePlus", true)
