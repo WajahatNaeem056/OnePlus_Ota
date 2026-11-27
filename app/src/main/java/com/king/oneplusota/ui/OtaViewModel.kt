@@ -12,8 +12,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.king.oneplusota.ServiceLocator
+import com.king.oneplusota.data.CatalogDevice
+import com.king.oneplusota.data.CatalogVariant
 import com.king.oneplusota.data.CheckResult
 import com.king.oneplusota.data.OtaPackage
+import com.king.oneplusota.device.DeviceInfo
 import com.king.oneplusota.device.DeviceReader
 import com.king.oneplusota.download.DlJob
 import com.king.oneplusota.download.DownloadCenter
@@ -45,24 +48,76 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
 
     init { DownloadCenter.restore(store) }
 
-    fun setRegion(id: Int?) { regionId = id; ServiceLocator.regionOverride = id }
+    fun setRegion(id: Int?) { regionId = id }
+
+    /** Device as it will be queried on the Update tab (region override applied). */
+    val updateSpec: DeviceInfo get() = device.copy(regionId = regionId ?: device.regionId)
+
+    // ---- "Other" tab: any OnePlus device from the catalog ----------------------------------------
+    var catalog by mutableStateOf<List<CatalogDevice>>(emptyList())
+        private set
+    var catalogLoading by mutableStateOf(false)
+        private set
+    var catalogError by mutableStateOf<String?>(null)
+        private set
+    var query by mutableStateOf("")
+    var selected by mutableStateOf<CatalogDevice?>(null)
+        private set
+    var variant by mutableStateOf<CatalogVariant?>(null)
+        private set
+    var otherCheck by mutableStateOf<CheckUi>(CheckUi.Idle)
+        private set
+
+    fun loadCatalog() {
+        if (catalogLoading || catalog.isNotEmpty()) return
+        viewModelScope.launch {
+            catalogLoading = true; catalogError = null
+            val cache = File(app.filesDir, "oneplus_catalog.json")
+            ServiceLocator.catalog.load(cache)
+                .onSuccess { catalog = it }
+                .onFailure { catalogError = "Device list load nahi hui (${it.message}). Internet check karke dobara try karo." }
+            catalogLoading = false
+        }
+    }
+
+    fun reloadCatalog() { catalog = emptyList(); loadCatalog() }
+
+    fun select(d: CatalogDevice?) {
+        selected = d; variant = d?.variants?.firstOrNull(); otherCheck = CheckUi.Idle
+    }
+
+    fun selectVariant(v: CatalogVariant) { variant = v; otherCheck = CheckUi.Idle }
+
+    val otherSpec: DeviceInfo?
+        get() = variant?.let { v -> selected?.let { v.toDeviceInfo(it.name) } }
+
+    fun checkOther() {
+        val spec = otherSpec ?: return
+        viewModelScope.launch {
+            otherCheck = CheckUi.Loading
+            otherCheck = CheckUi.Result(ServiceLocator.chain.check(spec, fullOnly))
+        }
+    }
 
     fun checkUpdate() {
         viewModelScope.launch {
             check = CheckUi.Loading
-            check = CheckUi.Result(ServiceLocator.chain.check(device, fullOnly))
+            check = CheckUi.Result(ServiceLocator.chain.check(updateSpec, fullOnly))
         }
     }
 
-    fun download(pkg: OtaPackage) {
+    fun download(pkg: OtaPackage, spec: DeviceInfo) {
         val existing = store.load()
         val sameFile = existing != null && existing.pkg.fileName == pkg.fileName
         if (existing != null && !sameFile) store.partFile(existing.pkg).delete()
         // Same file + partial data on disk -> keep it. The download continues from that byte.
-        val job = if (sameFile) existing!!.also { it.pkg = pkg } else DlJob(pkg)
+        val job = if (sameFile) existing!!.also { it.pkg = pkg; it.spec = spec } else DlJob(pkg, spec = spec)
         store.save(job)
         DownloadService.send(app, DownloadService.ACTION_START)
     }
+
+    /** Retry when nothing was downloaded yet: start the same package again with its original device context. */
+    fun restart(pkg: OtaPackage) = download(pkg, store.load()?.spec ?: updateSpec)
 
     fun resume() = DownloadService.send(app, DownloadService.ACTION_RESUME)
     fun pause() = DownloadService.send(app, DownloadService.ACTION_PAUSE)

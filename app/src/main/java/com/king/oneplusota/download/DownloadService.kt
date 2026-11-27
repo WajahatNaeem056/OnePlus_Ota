@@ -62,7 +62,7 @@ class DownloadService : Service() {
             val result = downloader.run(
                 job = job, part = part,
                 refresh = {
-                    val r = ServiceLocator.chain.check(DeviceReader.read(), fullOnly = true)
+                    val r = ServiceLocator.chain.check(job.spec ?: DeviceReader.read(), fullOnly = true)
                     (r as? CheckResult.Found)?.pkg
                 },
                 onProgress = { done, total, bps, note ->

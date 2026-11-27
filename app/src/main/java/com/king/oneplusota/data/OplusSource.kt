@@ -139,23 +139,23 @@ internal fun baselineOtaVersion(current: String): String {
 }
 
 /** Primary: the device's own region gateway. Auto-detects model + OTA version from the phone. */
-class OplusDirectSource(private val client: OplusClient, private val regionOverride: () -> Int?) : OtaSource {
+class OplusDirectSource(private val client: OplusClient) : OtaSource {
     override val type = SourceType.OPLUS_DIRECT
 
     override suspend fun fetch(dev: DeviceInfo, fullOnly: Boolean): SourceOutcome = withContext(Dispatchers.IO) {
         if (dev.otaVersion.isBlank()) return@withContext SourceOutcome.Error("ro.build.version.ota padh nahi paya")
-        val server = OplusServers.byId(regionOverride() ?: dev.regionId)
+        val server = OplusServers.byId(dev.regionId)
         resolve(client, dev, listOf(server), fullOnly, type)
     }
 }
 
 /** The "half" third source: same protocol, other regional gateways, tried one by one. */
-class OplusGatewayFallbackSource(private val client: OplusClient, private val regionOverride: () -> Int?) : OtaSource {
+class OplusGatewayFallbackSource(private val client: OplusClient) : OtaSource {
     override val type = SourceType.OPLUS_GATEWAYS
 
     override suspend fun fetch(dev: DeviceInfo, fullOnly: Boolean): SourceOutcome = withContext(Dispatchers.IO) {
         if (dev.otaVersion.isBlank()) return@withContext SourceOutcome.Error("OTA version missing")
-        resolve(client, dev, OplusServers.othersThan(regionOverride() ?: dev.regionId), fullOnly, type)
+        resolve(client, dev, OplusServers.othersThan(dev.regionId), fullOnly, type)
     }
 }
 

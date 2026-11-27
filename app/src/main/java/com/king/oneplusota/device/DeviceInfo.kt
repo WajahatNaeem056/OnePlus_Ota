@@ -1,6 +1,7 @@
 package com.king.oneplusota.device
 
 import android.os.Build
+import org.json.JSONObject
 
 object SysProps {
     private val getter by lazy {
@@ -27,6 +28,19 @@ data class DeviceInfo(
 ) {
     val isOnePlus: Boolean
         get() = manufacturer.equals("OnePlus", true) || Build.BRAND.equals("OnePlus", true)
+
+    fun toJson(): JSONObject = JSONObject().put("manufacturer", manufacturer).put("model", model)
+        .put("product", product).put("marketName", marketName).put("otaVersion", otaVersion)
+        .put("androidRelease", androidRelease).put("osVersion", osVersion)
+        .put("fingerprint", fingerprint).put("regionId", regionId)
+
+    companion object {
+        fun fromJson(o: JSONObject) = DeviceInfo(
+            o.optString("manufacturer"), o.optString("model"), o.optString("product"),
+            o.optString("marketName"), o.optString("otaVersion"), o.optString("androidRelease"),
+            o.optString("osVersion"), o.optString("fingerprint"), o.optInt("regionId", 0),
+        )
+    }
 }
 
 object DeviceReader {
@@ -35,7 +49,11 @@ object DeviceReader {
             "ro.vendor.oplus.regionmark", "ro.oplus.regionmark", "persist.sys.oplus.region",
         ).map { SysProps.get(it) }.firstOrNull { it.isNotBlank() }.orEmpty().uppercase()
 
+        val product = SysProps.get("ro.product.name", Build.PRODUCT).uppercase()
         val region = when {
+            product.endsWith("EEA") -> 3
+            product.endsWith("IN") -> 2
+            Regex("^P[A-Z]{2}\\d{3}$").matches(Build.MODEL.uppercase()) -> 1
             regionMark.startsWith("CN") -> 1
             regionMark.startsWith("IN") -> 2
             regionMark.startsWith("EU") -> 3

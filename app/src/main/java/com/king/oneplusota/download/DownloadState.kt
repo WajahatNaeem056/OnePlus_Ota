@@ -2,6 +2,7 @@ package com.king.oneplusota.download
 
 import android.content.Context
 import com.king.oneplusota.data.OtaPackage
+import com.king.oneplusota.device.DeviceInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONObject
@@ -17,9 +18,13 @@ sealed interface DlState {
 }
 
 /** Mutable job: the url can be swapped when the link expires, etag/total are learned from the server. */
-class DlJob(var pkg: OtaPackage, var etag: String? = null, var lastModified: String? = null, var total: Long = pkg.sizeBytes) {
+class DlJob(
+    var pkg: OtaPackage, var etag: String? = null, var lastModified: String? = null,
+    var total: Long = pkg.sizeBytes, var spec: DeviceInfo? = null,
+) {
     fun toJson(): JSONObject = JSONObject().put("pkg", pkg.toJson())
         .put("etag", etag ?: JSONObject.NULL).put("lastModified", lastModified ?: JSONObject.NULL).put("total", total)
+        .put("spec", spec?.toJson() ?: JSONObject.NULL)
 
     companion object {
         fun fromJson(o: JSONObject) = DlJob(
@@ -27,6 +32,7 @@ class DlJob(var pkg: OtaPackage, var etag: String? = null, var lastModified: Str
             etag = o.optString("etag").takeIf { it.isNotBlank() && it != "null" },
             lastModified = o.optString("lastModified").takeIf { it.isNotBlank() && it != "null" },
             total = o.optLong("total", 0L),
+            spec = o.optJSONObject("spec")?.let { DeviceInfo.fromJson(it) },
         )
     }
 }
