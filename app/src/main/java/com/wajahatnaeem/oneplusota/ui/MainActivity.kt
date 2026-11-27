@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
@@ -65,11 +66,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun Root(vm: OtaViewModel) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    // Scaffold applies the status-bar / navigation-bar insets, so the title never overlaps the clock.
-    Scaffold(
-        bottomBar = { if (vm.device.isOnePlus) FloatingBar(tab) { tab = it } },
-    ) { inner ->
-        Box(Modifier.padding(inner).fillMaxSize().pointerInput(vm.device.isOnePlus) {
+    // The bar floats over the content (no hard clip line); lists keep bottom padding so the last item scrolls above it.
+    Box(Modifier.fillMaxSize()) {
+        Box(Modifier.statusBarsPadding().fillMaxSize().pointerInput(vm.device.isOnePlus) {
             if (!vm.device.isOnePlus) return@pointerInput
             val threshold = 80.dp.toPx()
             var total = 0f
@@ -81,13 +80,14 @@ private fun Root(vm: OtaViewModel) {
         }) {
             if (tab == 0 || !vm.device.isOnePlus) UpdateTab(vm) else OtherTab(vm)
         }
+        if (vm.device.isOnePlus) Box(Modifier.align(Alignment.BottomCenter)) { FloatingBar(tab) { tab = it } }
     }
 }
 
 @Composable
 private fun FloatingBar(selected: Int, onSelect: (Int) -> Unit) {
     Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
-        Surface(shape = RoundedCornerShape(30.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 3.dp) {
+        Surface(shape = RoundedCornerShape(30.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 3.dp, shadowElevation = 6.dp) {
             Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 BarItem(0, selected, AppIcons.SystemUpdate, "My phone", onSelect)
                 BarItem(1, selected, AppIcons.Devices, "Devices", onSelect)

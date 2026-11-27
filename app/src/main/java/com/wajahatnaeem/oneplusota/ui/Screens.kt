@@ -88,7 +88,7 @@ fun UpdateTab(vm: OtaViewModel) {
     val dl by vm.dl.collectAsState()
     val start = rememberStarter(vm)
 
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 104.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("OnePlus OTA", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp, start = 4.dp)) }
         if (vm.device.isOnePlus) {
             item {
@@ -146,7 +146,7 @@ fun OtherTab(vm: OtaViewModel) {
     LaunchedEffect(Unit) { vm.loadCatalog() }
     val sel = vm.selected
 
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 104.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("OnePlus OTA", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp, start = 4.dp)) }
 
         if (sel == null) {
