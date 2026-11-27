@@ -7,6 +7,7 @@ import android.content.ContentValues
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -47,6 +48,11 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
     var check by mutableStateOf<CheckUi>(CheckUi.Idle)
         private set
     var message by mutableStateOf<String?>(null)
+    /** When the last check finished (epoch ms), for the "Checked just now" label. */
+    var checkedAt by mutableLongStateOf(0L)
+        private set
+    var otherCheckedAt by mutableLongStateOf(0L)
+        private set
 
     // ---- link tools: resolve + verify the link before it is copied / shared / opened -------------------
     var linkFor by mutableStateOf<String?>(null)
@@ -68,7 +74,7 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
                 val res = ServiceLocator.chain.check(spec, fullOnly)
                 if (res is CheckResult.Found) {
                     use = res.pkg
-                    if (other) otherCheck = CheckUi.Result(res) else check = CheckUi.Result(res)
+                    if (other) { otherCheck = CheckUi.Result(res); otherCheckedAt = System.currentTimeMillis() } else { check = CheckUi.Result(res); checkedAt = System.currentTimeMillis() }
                 } else message = "Couldn't get a fresh link, copied the last one."
             }
             linkFor = use.url
@@ -130,14 +136,14 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
         val spec = otherSpec ?: return
         viewModelScope.launch {
             otherCheck = CheckUi.Loading; linkFor = null; linkStatus = LinkStatus.Idle
-            otherCheck = CheckUi.Result(ServiceLocator.chain.check(spec, fullOnly))
+            otherCheck = CheckUi.Result(ServiceLocator.chain.check(spec, fullOnly)); otherCheckedAt = System.currentTimeMillis()
         }
     }
 
     fun checkUpdate() {
         viewModelScope.launch {
             check = CheckUi.Loading; linkFor = null; linkStatus = LinkStatus.Idle
-            check = CheckUi.Result(ServiceLocator.chain.check(updateSpec, fullOnly))
+            check = CheckUi.Result(ServiceLocator.chain.check(updateSpec, fullOnly)); checkedAt = System.currentTimeMillis()
         }
     }
 

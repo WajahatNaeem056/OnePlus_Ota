@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalLayoutApi::class)
+
 package com.wajahatnaeem.oneplusota.ui
 
 import android.Manifest
@@ -12,6 +14,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.height
@@ -44,6 +49,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -119,7 +126,7 @@ fun UpdateTab(vm: OtaViewModel) {
                 Text(if (vm.check is CheckUi.Result) "Check again" else "Check for update")
             }
         }
-        item { CheckCard(vm, vm.check, false) { start(it, vm.updateSpec) } }
+        item { CheckCard(vm, vm.check, false, vm.checkedAt) { start(it, vm.updateSpec) } }
         item { DownloadCard(vm, dl) }
         vm.message?.let { m -> item { Text(m, color = MaterialTheme.colorScheme.primary) } }
         item { androidx.compose.foundation.layout.Spacer(Modifier.padding(8.dp)) }
@@ -198,7 +205,7 @@ fun OtherTab(vm: OtaViewModel) {
                 }
             }
             item {
-                CheckCard(vm, vm.otherCheck, true) { pkg -> vm.otherSpec?.let { start(pkg, it) } }
+                CheckCard(vm, vm.otherCheck, true, vm.otherCheckedAt) { pkg -> vm.otherSpec?.let { start(pkg, it) } }
             }
             item { DownloadCard(vm, dl) }
             vm.message?.let { m -> item { Text(m, color = MaterialTheme.colorScheme.primary) } }
@@ -211,8 +218,8 @@ fun OtherTab(vm: OtaViewModel) {
 // Shared cards
 // =================================================================================================
 @Composable
-private fun InfoLine(label: String, value: String) {
-    Text("$label $value", fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+private fun InfoLine(text: String, maxLines: Int = 1) {
+    Text(text, fontSize = 12.sp, lineHeight = 17.sp, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
 }
 
@@ -221,20 +228,24 @@ private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, other: Boolean, ctx: 
     val status = if (vm.linkFor == pkg.url) vm.linkStatus else LinkStatus.Idle
     val shown = (status as? LinkStatus.Live)?.finalUrl ?: pkg.url
 
-    Text("Download link", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Text(shown, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(14.dp)).padding(12.dp))
-    FilledTonalButton(onClick = { vm.copyFreshLink(pkg, other) { LinkTools.copy(ctx, "Fresh link", it) } },
-        enabled = status != LinkStatus.Checking, shape = RoundedCornerShape(23.dp), modifier = Modifier.fillMaxWidth().height(46.dp)) {
-        Icon(AppIcons.Copy, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
-        Text(if (status == LinkStatus.Checking) "Getting fresh link…" else "Copy link")
+    Text("Download link", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(shown, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(16.dp))
+                .padding(horizontal = 16.dp, vertical = 14.dp))
+        FilledTonalButton(onClick = { vm.copyFreshLink(pkg, other) { LinkTools.copy(ctx, "Fresh link", it) } },
+            enabled = status != LinkStatus.Checking, shape = RoundedCornerShape(20.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp), modifier = Modifier.height(48.dp)) {
+            Icon(AppIcons.Copy, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp))
+            Text(if (status == LinkStatus.Checking) "…" else "Copy")
+        }
     }
-    Column {
-        pkg.fileName.takeIf { !it.equals("downloadCheck", ignoreCase = true) }?.let { InfoLine("File name:", it) }
-        pkg.md5?.let { InfoLine("MD5:", it) }
+    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        pkg.fileName.takeIf { !it.equals("downloadCheck", ignoreCase = true) }?.let { InfoLine("File name: $it") }
+        pkg.md5?.let { InfoLine("MD5: $it") }
+        InfoLine("Source: ${pkg.source.label} · Link may expire in 15–30 minutes. Tap Check again for a fresh one.", maxLines = 3)
     }
-    Text("Source: ${pkg.source.label} · Link may expire in 15–30 minutes. Tap Check again for a fresh one.",
-        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
@@ -244,61 +255,89 @@ private fun Chip(text: String) {
     }
 }
 
-/** Removes markdown heading marks (##) that some changelogs contain. */
-private fun cleanChangelog(s: String) = s.lines().joinToString("\n") { it.trimStart('#').trim() }
+private fun agoLabel(at: Long, now: Long): String {
+    val sec = ((now - at) / 1000).coerceAtLeast(0)
+    return when {
+        sec < 60 -> "Checked just now"
+        sec < 3600 -> "Checked ${sec / 60} min ago"
+        else -> "Checked ${sec / 3600} h ago"
+    }
+}
 
-/** Long text collapsed to a few lines with a Show more / Show less toggle. */
+/** Changelog text: heading lines (## or a short line without end punctuation) become bold titles, the rest is body text. */
 @Composable
-private fun Expandable(text: String, collapsedLines: Int = 5) {
+private fun ChangelogBody(text: String) {
+    val lines = text.lines().map { it.trim() }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        lines.forEachIndexed { i, raw ->
+            val line = raw.trimStart('#').trim()
+            if (line.isBlank()) { if (raw.isBlank()) Spacer(Modifier.height(4.dp)); return@forEachIndexed }
+            val next = lines.drop(i + 1).firstOrNull { it.isNotBlank() }
+            val isTitle = raw.startsWith("#") || (line.length <= 40 && line.last() !in ".:;,!" &&
+                !line.startsWith("•") && !line.startsWith("-") && next != null)
+            if (isTitle) Text(line, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = if (i > 0) 10.dp else 0.dp))
+            else Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** Card with a title row + chevron; the body shows only when opened. */
+@Composable
+private fun FoldCard(title: String, content: @Composable () -> Unit) {
     var open by remember { mutableStateOf(false) }
-    Column {
-        Text(text, style = MaterialTheme.typography.bodySmall,
-            maxLines = if (open) Int.MAX_VALUE else collapsedLines, overflow = TextOverflow.Ellipsis)
-        TextButton(onClick = { open = !open }) { Text(if (open) "Show less" else "Show more") }
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Row(Modifier.fillMaxWidth().clickable { open = !open }.padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Icon(if (open) AppIcons.ExpandLess else AppIcons.ExpandMore, null, Modifier.size(24.dp))
+        }
+        if (open) Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 18.dp)) { content() }
     }
 }
 
 @Composable
-private fun Collapsible(title: String, body: String) {
-    var open by remember { mutableStateOf(false) }
-    Column {
-        TextButton(onClick = { open = !open }) { Text(if (open) "▾ $title" else "▸ $title") }
-        if (open) Text(body, style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, onDownload: (OtaPackage) -> Unit) {
+private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedAt: Long, onDownload: (OtaPackage) -> Unit) {
     val ctx = LocalContext.current
     when (state) {
         CheckUi.Idle -> {}
         CheckUi.Loading -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
         is CheckUi.Result -> when (val r = state.r) {
-            is CheckResult.Found -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                val cardColors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = cardColors) {
-                    Column(Modifier.padding(18.dp)) {
-                        Text("Latest full OTA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(r.pkg.version, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                        Row(Modifier.padding(vertical = 14.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Chip(fmt(r.pkg.sizeBytes))
-                            Chip(if (r.pkg.source == SourceType.OXYGEN_UPDATER) "Backup" else "Official")
-                            r.pkg.securityPatch?.let { Chip("Patch $it") }
+            is CheckResult.Found -> {
+                var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+                LaunchedEffect(checkedAt) { now = System.currentTimeMillis(); while (true) { delay(20_000); now = System.currentTimeMillis() } }
+                val inner = MaterialTheme.colorScheme.surfaceContainerLow
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(AppIcons.CheckCircle, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(10.dp))
+                            Text("Update found", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                            if (checkedAt > 0) Text(agoLabel(checkedAt, now), style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Button(onClick = { onDownload(r.pkg) }, shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
-                            Icon(AppIcons.Download, null, Modifier.size(22.dp)); Spacer(Modifier.width(8.dp))
-                            Text("Download")
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(inner).padding(18.dp)) {
+                            Text("Latest full OTA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(r.pkg.version, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                            FlowRow(Modifier.padding(vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Chip(fmt(r.pkg.sizeBytes))
+                                Chip(if (r.pkg.source == SourceType.OXYGEN_UPDATER) "Backup" else "Official")
+                                r.pkg.securityPatch?.let { Chip("Patch $it") }
+                            }
+                            Button(onClick = { onDownload(r.pkg) }, shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                                Icon(AppIcons.Download, null, Modifier.size(22.dp)); Spacer(Modifier.width(8.dp))
+                                Text("Download")
+                            }
                         }
-                    }
-                }
-                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = cardColors) {
-                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { LinkSection(vm, r.pkg, other, ctx) }
-                }
-                if (r.notes.isNotEmpty() || r.pkg.changelog != null) {
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = cardColors) {
-                        Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                            if (r.notes.isNotEmpty()) Collapsible("Source log", r.notes.joinToString("\n") { "• $it" })
-                            r.pkg.changelog?.let { Expandable(cleanChangelog(it)) }
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(inner).padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)) { LinkSection(vm, r.pkg, other, ctx) }
+                        r.pkg.changelog?.let { cl -> FoldCard("Changelog") { ChangelogBody(cl) } }
+                        if (r.notes.isNotEmpty()) FoldCard("Source log") {
+                            Text(r.notes.joinToString("\n") { "• $it" }, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
