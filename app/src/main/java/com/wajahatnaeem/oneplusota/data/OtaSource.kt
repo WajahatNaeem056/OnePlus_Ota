@@ -11,7 +11,7 @@ interface OtaSource {
 }
 
 /** Asks the first group of sources together and keeps the newest package; later groups only run when the earlier ones found nothing. */
-class SourceChain(private val groups: List<List<OtaSource>>) {
+class SourceChain(private val groups: List<List<OtaSource>>, private val links: LinkResolver) {
     suspend fun check(dev: DeviceInfo, fullOnly: Boolean): CheckResult {
         val notes = mutableListOf<String>()
         var sawNoUpdate = false
@@ -41,10 +41,16 @@ class SourceChain(private val groups: List<List<OtaSource>>) {
                     changelog = b.changelog ?: same.firstNotNullOfOrNull { it.changelog },
                     securityPatch = b.securityPatch ?: same.firstNotNullOfOrNull { it.securityPatch },
                 )
-                return CheckResult.Found(merged, notes)
+                return CheckResult.Found(withRealName(merged), notes)
             }
         }
         return if (sawNoUpdate) CheckResult.NoPackage(notes) else CheckResult.Failed(notes)
+    }
+
+    private suspend fun withRealName(pkg: OtaPackage): OtaPackage {
+        if (!pkg.url.contains("/downloadCheck", ignoreCase = true)) return pkg
+        val name = links.fileName(pkg.url) ?: return pkg
+        return pkg.copy(fileName = name)
     }
 }
 

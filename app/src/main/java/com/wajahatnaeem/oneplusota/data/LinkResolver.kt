@@ -26,6 +26,12 @@ sealed interface LinkStatus {
 class LinkResolver(http: OkHttpClient) {
     private val client = http.newBuilder().followRedirects(false).followSslRedirects(false).build()
 
+    suspend fun fileName(url: String): String? {
+        val real = (resolve(url) as? LinkStatus.Live)?.finalUrl ?: return null
+        val name = real.substringBefore('?').substringAfterLast('/').takeIf { it.isNotBlank() } ?: return null
+        return if ('.' in name) name else "$name.zip"
+    }
+
     suspend fun resolve(url: String): LinkStatus = withContext(Dispatchers.IO) {
         var current = url
         var hops = 0

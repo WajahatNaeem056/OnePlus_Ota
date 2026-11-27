@@ -33,6 +33,7 @@ object ServiceLocator {
                 listOf(OplusDirectSource(oplusClient), OxygenUpdaterSource(http)),
                 listOf(OplusGatewayFallbackSource(oplusClient)),
             ),
+            linkResolver,
         )
     }
 }
