@@ -157,8 +157,8 @@ class OplusClient(private val http: OkHttpClient) {
                 otaVersion = findString(json, "otaVersion") ?: c.optString("componentVersion").ifBlank { null },
                 url = url, sizeBytes = size, md5 = p.optString("md5").ifBlank { null },
                 fileName = name,
-                changelog = listOfNotNull(findString(json, "securityPatch")?.let { "Security patch: $it" })
-                    .joinToString("\n").ifBlank { null },
+                changelog = null,
+                securityPatch = findString(json, "securityPatch"),
                 // Heuristic: not marked as patch AND big enough. Calibrate with raw JSON on the real device.
                 isFull = !incremental && size >= FULL_MIN_BYTES,
                 source = source,

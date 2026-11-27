@@ -18,12 +18,14 @@ data class OtaPackage(
     val changelog: String?,
     val isFull: Boolean,
     val source: SourceType,
+    val securityPatch: String? = null,
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("version", version).put("otaVersion", otaVersion ?: JSONObject.NULL)
         .put("url", url).put("sizeBytes", sizeBytes).put("md5", md5 ?: JSONObject.NULL)
         .put("fileName", fileName).put("changelog", changelog ?: JSONObject.NULL)
         .put("isFull", isFull).put("source", source.name)
+        .put("securityPatch", securityPatch ?: JSONObject.NULL)
 
     companion object {
         fun fromJson(o: JSONObject) = OtaPackage(
@@ -36,6 +38,7 @@ data class OtaPackage(
             changelog = o.optString("changelog").takeIf { it.isNotBlank() && it != "null" },
             isFull = o.optBoolean("isFull", false),
             source = runCatching { SourceType.valueOf(o.getString("source")) }.getOrDefault(SourceType.OPLUS_DIRECT),
+            securityPatch = o.optString("securityPatch").takeIf { it.isNotBlank() && it != "null" },
         )
     }
 }

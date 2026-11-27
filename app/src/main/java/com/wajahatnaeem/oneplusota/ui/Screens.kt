@@ -273,10 +273,11 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, onDownlo
                     Column(Modifier.padding(18.dp)) {
                         Text("Latest full OTA", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                         Text(r.pkg.version, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                        Row(Modifier.padding(vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.padding(vertical = 14.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Chip(fmt(r.pkg.sizeBytes))
                             Chip(if (r.pkg.isFull) "Full" else "Incremental")
                             Chip(if (r.pkg.source == SourceType.OXYGEN_UPDATER) "Backup" else "Official")
+                            r.pkg.securityPatch?.let { Chip("Patch $it") }
                         }
                         Button(onClick = { onDownload(r.pkg) }, shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
                             Icon(AppIcons.Download, null, Modifier.size(22.dp)); Spacer(Modifier.width(8.dp))
