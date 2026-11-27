@@ -23,7 +23,7 @@ object LinkTools {
         appendLine("${if (pkg.isFull) "Full OTA" else "OTA"} · ${bytes(pkg.sizeBytes)}")
         pkg.md5?.let { appendLine("MD5: $it") }
         appendLine("Download link: $url")
-        append("Links can expire. Verify the MD5 after downloading.")
+        append("Link may expire in 15–30 minutes. Verify the MD5 after downloading.")
     }
 
     fun share(ctx: Context, text: String) {

@@ -226,7 +226,7 @@ private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, other: Boolean, ctx: 
     pkg.md5?.let { md5 ->
         Text("MD5  $md5", fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    Text("Source: ${pkg.source.label} · Links can expire after some hours or days.",
+    Text("Source: ${pkg.source.label} · Link may expire in 15–30 minutes. Tap Check again for a fresh one.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
@@ -275,7 +275,6 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, onDownlo
                         Text(r.pkg.version, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                         Row(Modifier.padding(vertical = 14.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Chip(fmt(r.pkg.sizeBytes))
-                            Chip(if (r.pkg.isFull) "Full" else "Incremental")
                             Chip(if (r.pkg.source == SourceType.OXYGEN_UPDATER) "Backup" else "Official")
                             r.pkg.securityPatch?.let { Chip("Patch $it") }
                         }
