@@ -207,24 +207,16 @@ fun OtherTab(vm: OtaViewModel) {
 private fun LinkSection(vm: OtaViewModel, pkg: OtaPackage, deviceLabel: String, ctx: android.content.Context) {
     val status = if (vm.linkFor == pkg.url) vm.linkStatus else LinkStatus.Idle
     val shown = (status as? LinkStatus.Live)?.finalUrl ?: pkg.url
-    val box = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(start = 10.dp, top = 4.dp, bottom = 4.dp, end = 4.dp)
 
     HorizontalDivider(Modifier.padding(vertical = 8.dp))
     Text("Download link", style = MaterialTheme.typography.labelMedium)
-    Row(box, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        SelectionContainer(Modifier.weight(1f)) {
-            Text(shown, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        OutlinedButton(onClick = { vm.useLink(pkg) { LinkTools.copy(ctx, "Link", it) } }) { Text("Copy") }
-    }
+    Text(shown, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp))
+    Button(onClick = { vm.useLink(pkg) { LinkTools.copy(ctx, "Link", it) } }, modifier = Modifier.fillMaxWidth()) { Text("Copy link") }
     pkg.md5?.let { md5 ->
-        Row(box, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("MD5", style = MaterialTheme.typography.labelMedium)
-            SelectionContainer(Modifier.weight(1f)) {
-                Text(md5, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            OutlinedButton(onClick = { LinkTools.copy(ctx, "MD5", md5) }) { Text("Copy") }
-        }
+        Text("MD5: $md5", fontFamily = FontFamily.Monospace, fontSize = 12.sp,
+            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)).padding(10.dp))
+        OutlinedButton(onClick = { LinkTools.copy(ctx, "MD5", md5) }, modifier = Modifier.fillMaxWidth()) { Text("Copy MD5") }
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = { vm.useLink(pkg) { LinkTools.share(ctx, LinkTools.shareText(deviceLabel, pkg, it)) } }, modifier = Modifier.weight(1f)) { Text("Share") }

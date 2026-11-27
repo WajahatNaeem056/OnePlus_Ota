@@ -11,7 +11,8 @@ import java.io.File
 
 /** One region build of a device (e.g. 13R / EU / CPH2645EEA). */
 data class CatalogVariant(val region: String, val productModel: String, val productName: String?, val letter: String) {
-    val regionId: Int get() = when (region.uppercase()) { "CN" -> 1; "IN" -> 2; "EU" -> 3; else -> 0 }
+    val isChina: Boolean get() = region.equals("CN", true) || region.startsWith("Genshin", true)
+    val regionId: Int get() = if (isChina) 1 else when (region.uppercase()) { "IN" -> 2; "EU" -> 3; else -> 0 }
     val label: String get() = when (region.uppercase()) { "GLO" -> "Global / NA"; "EU" -> "EU"; "IN" -> "India"; "CN" -> "China"; else -> region }
 
     /** Same shape OTA Pulse sends for catalog devices: an "old" build, so the server answers with the newest. */
@@ -47,6 +48,22 @@ class DeviceCatalog(private val http: OkHttpClient) {
         }
     }
 
+    /**
+     * The catalog merges a global phone and its China twin into one name ("OnePlus 13R/Ace 5").
+     * Split them: non-China builds go to the first name, China builds to the second.
+     */
+    private fun split(name: String, android: String, variants: List<CatalogVariant>): List<CatalogDevice> {
+        val parts = name.split("/").map { it.trim() }.filter { it.isNotEmpty() }
+        if (parts.size != 2) return if (variants.isEmpty()) emptyList() else listOf(CatalogDevice(name, android, variants))
+        val first = parts[0]
+        val second = if (parts[1].startsWith("OnePlus", ignoreCase = true)) parts[1] else "OnePlus ${parts[1]}"
+        val (cn, other) = variants.partition { it.isChina }
+        return listOfNotNull(
+            other.takeIf { it.isNotEmpty() }?.let { CatalogDevice(first, android, it) },
+            cn.takeIf { it.isNotEmpty() }?.let { CatalogDevice(second, android, it) },
+        )
+    }
+
     fun parse(text: String): List<CatalogDevice> {
         val arr = JSONArray(text)
         val out = mutableListOf<CatalogDevice>()
@@ -72,7 +89,7 @@ class DeviceCatalog(private val http: OkHttpClient) {
                 }
                 is JSONArray -> for (j in 0 until g.length()) g.optJSONObject(j)?.let { add(it, null) }
             }
-            if (variants.isNotEmpty()) out += CatalogDevice(d.optString("name"), key, variants)
+            out += split(d.optString("name"), key, variants)
         }
         return out
     }
