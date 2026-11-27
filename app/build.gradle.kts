@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.king.oneplusota"
+    namespace = "com.wajahatnaeem.oneplusota"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.king.oneplusota"
+        applicationId = "com.wajahatnaeem.oneplusota"
         minSdk = 29
         targetSdk = 35
         versionCode = 1
