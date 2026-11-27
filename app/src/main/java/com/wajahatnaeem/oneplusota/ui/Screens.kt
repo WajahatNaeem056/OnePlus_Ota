@@ -212,7 +212,7 @@ fun OtherTab(vm: OtaViewModel) {
 // =================================================================================================
 @Composable
 private fun InfoLine(label: String, value: String) {
-    Text("$label $value", fontFamily = FontFamily.Monospace, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+    Text("$label $value", fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
 }
 
