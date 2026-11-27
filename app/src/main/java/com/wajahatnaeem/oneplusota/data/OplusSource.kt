@@ -233,6 +233,19 @@ private class Probe(val json: JSONObject?, val pkg: OtaPackage?, val desc: Strin
 private suspend fun resolve(
     client: OplusClient, dev: DeviceInfo, servers: List<OplusServers.Server>,
     fullOnly: Boolean, type: SourceType,
+): SourceOutcome {
+    val releases = if (dev.androidRelease.isBlank()) listOf("", "17", "16") else listOf(dev.androidRelease)
+    var last: SourceOutcome = SourceOutcome.Error("")
+    for (r in releases) {
+        last = resolveOnce(client, dev.copy(androidRelease = r), servers, fullOnly, type)
+        if (last is SourceOutcome.Found) break
+    }
+    return last
+}
+
+private suspend fun resolveOnce(
+    client: OplusClient, dev: DeviceInfo, servers: List<OplusServers.Server>,
+    fullOnly: Boolean, type: SourceType,
 ): SourceOutcome = coroutineScope {
     // Full-only: ask as old builds (server hands out the newest full zip) and as the phone's real build.
     // Catalog devices don't know their build letter, so every letter is tried and the newest full package wins.

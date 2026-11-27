@@ -10,7 +10,7 @@ import org.json.JSONObject
 import java.io.File
 
 /** One region build of a device (e.g. 13R / EU / CPH2645EEA). */
-data class CatalogVariant(val region: String, val productModel: String, val productName: String?, val letter: String, val reqMode: String = "manual", val gen: String = "") {
+data class CatalogVariant(val region: String, val productModel: String, val productName: String?, val letter: String, val reqMode: String = "manual") {
     val isChina: Boolean get() = region.equals("CN", true) || region.startsWith("Genshin", true)
     val regionId: Int get() = if (isChina) 1 else when (region.uppercase()) { "IN" -> 2; "EU" -> 3; else -> 0 }
     /** Short tag shown in the list, e.g. "EU", "IN", "GLO", "CN". */
@@ -34,7 +34,7 @@ data class CatalogVariant(val region: String, val productModel: String, val prod
     fun toDeviceInfo(marketName: String, generation: String = "") = DeviceInfo(
         manufacturer = "OnePlus", model = productModel, product = productName ?: productModel,
         marketName = marketName, otaVersion = otaVersion,
-        androidRelease = Regex("\\d+").find(gen.ifBlank { generation })?.value.orEmpty(), osVersion = "",
+        androidRelease = Regex("\\d+").find(generation)?.value.orEmpty(), osVersion = "",
         fingerprint = "", regionId = regionId, reqMode = reqMode, nvId = nvId, probe = true,
     )
 }
@@ -83,14 +83,9 @@ class DeviceCatalog(private val http: OkHttpClient) {
         val out = mutableListOf<CatalogDevice>()
         for (i in 0 until arr.length()) {
             val d = arr.optJSONObject(i) ?: continue
-            val groups = d.optJSONObject("firmwareGroups") ?: continue
-            // newest Android generation first; a region that only exists in an older group keeps that older group
-            val keys = groups.keys().asSequence()
-                .sortedByDescending { Regex("\\d+").find(it)?.value?.toIntOrNull() ?: 0 }.toList()
-            val newest = keys.firstOrNull() ?: continue
             val variants = mutableListOf<CatalogVariant>()
             val seen = mutableSetOf<String>()
-            fun add(o: JSONObject, groupLetter: String?, gen: String) {
+            fun add(o: JSONObject) {
                 val model = o.optString("productModel")
                 if (model.isBlank()) return
                 val region = o.optString("displayName", "GLO")
@@ -98,20 +93,12 @@ class DeviceCatalog(private val http: OkHttpClient) {
                 variants += CatalogVariant(
                     region = region, productModel = model,
                     productName = o.optString("productName").ifBlank { null },
-                    letter = o.optString("versionLetter").ifBlank { groupLetter ?: "A" },
+                    letter = "A",
                     reqMode = o.optString("reqMode").ifBlank { "manual" },
-                    gen = gen,
                 )
             }
-            for (key in keys) {
-                when (val g = groups.get(key)) {
-                    is String -> d.optJSONArray("variants")?.let { v ->
-                        for (j in 0 until v.length()) v.optJSONObject(j)?.let { add(it, g, key) }
-                    }
-                    is JSONArray -> for (j in 0 until g.length()) g.optJSONObject(j)?.let { add(it, null, key) }
-                }
-            }
-            out += split(d.optString("name"), newest, variants)
+            d.optJSONArray("variants")?.let { v -> for (j in 0 until v.length()) v.optJSONObject(j)?.let(::add) }
+            out += split(d.optString("name"), "", variants)
         }
         return out
     }

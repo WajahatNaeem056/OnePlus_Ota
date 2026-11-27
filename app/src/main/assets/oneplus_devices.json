@@ -1,116 +1,80 @@
 [
   {
     "name": "OnePlus 16",
-    "firmwareGroups": {
-      "Android 17": [
-        {
-          "displayName": "CN",
-          "productModel": "PYB110",
-          "versionLetter": "A"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "CN",
+        "productModel": "PYB110"
+      }
+    ]
   },
   {
     "name": "OnePlus Turbo 6",
-    "firmwareGroups": {
-      "Android 16": [
-        {
-          "displayName": "CN",
-          "productModel": "PLU110",
-          "versionLetter": "A"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "CN",
+        "productModel": "PLU110"
+      }
+    ]
   },
   {
     "name": "OnePlus 15T",
-    "firmwareGroups": {
-      "Android 16": [
-        {
-          "displayName": "CN",
-          "productModel": "PLZ110"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "CN",
+        "productModel": "PLZ110"
+      }
+    ]
   },
   {
     "name": "OnePlus 15R/Ace6T",
-    "firmwareGroups": {
-      "Android 16": [
-        {
-          "displayName": "IN",
-          "productModel": "CPH2767",
-          "productName": "CPH2767IN"
-        },
-        {
-          "displayName": "GLO",
-          "productModel": "CPH2769"
-        },
-        {
-          "displayName": "EU",
-          "productModel": "CPH2769",
-          "productName": "CPH2769EEA"
-        },
-        {
-          "displayName": "CN",
-          "productModel": "PLR110"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "IN",
+        "productModel": "CPH2767",
+        "productName": "CPH2767IN"
+      },
+      {
+        "displayName": "GLO",
+        "productModel": "CPH2769"
+      },
+      {
+        "displayName": "EU",
+        "productModel": "CPH2769",
+        "productName": "CPH2769EEA"
+      },
+      {
+        "displayName": "CN",
+        "productModel": "PLR110"
+      }
+    ]
   },
   {
     "name": "OnePlus 15",
-    "firmwareGroups": {
-      "Android 17": [
-        {
-          "displayName": "CN",
-          "productModel": "PLK110",
-          "versionLetter": "C",
-          "reqMode": "taste"
-        },
-        {
-          "displayName": "IN",
-          "productModel": "CPH2745",
-          "productName": "CPH2745IN",
-          "versionLetter": "C",
-          "reqMode": "taste"
-        },
-        {
-          "displayName": "GLO",
-          "productModel": "CPH2747",
-          "versionLetter": "C",
-          "reqMode": "taste"
-        },
-        {
-          "displayName": "EU",
-          "productModel": "CPH2747",
-          "productName": "CPH2747EEA",
-          "versionLetter": "C",
-          "reqMode": "taste"
-        }
-      ],
-      "Android 16": [
-        {
-          "displayName": "IN",
-          "productModel": "CPH2745",
-          "productName": "CPH2745IN"
-        },
-        {
-          "displayName": "GLO",
-          "productModel": "CPH2747"
-        },
-        {
-          "displayName": "EU",
-          "productModel": "CPH2747",
-          "productName": "CPH2747EEA"
-        },
-        {
-          "displayName": "CN",
-          "productModel": "PLK110"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "CN",
+        "productModel": "PLK110",
+        "reqMode": "taste"
+      },
+      {
+        "displayName": "IN",
+        "productModel": "CPH2745",
+        "productName": "CPH2745IN",
+        "reqMode": "taste"
+      },
+      {
+        "displayName": "GLO",
+        "productModel": "CPH2747",
+        "reqMode": "taste"
+      },
+      {
+        "displayName": "EU",
+        "productModel": "CPH2747",
+        "productName": "CPH2747EEA",
+        "reqMode": "taste"
+      }
+    ]
   },
   {
     "name": "OnePlus 13s",
@@ -129,29 +93,7 @@
         "productModel": "CPH2653",
         "productName": "CPH2653EEA"
       }
-    ],
-    "firmwareGroups": {
-      "Android 15": "A",
-      "Android 16": [
-        {
-          "displayName": "IN",
-          "productModel": "CPH2723",
-          "productName": "CPH2723IN",
-          "versionLetter": "C"
-        },
-        {
-          "displayName": "GLO",
-          "productModel": "CPH2653",
-          "versionLetter": "F"
-        },
-        {
-          "displayName": "EU",
-          "productModel": "CPH2653",
-          "productName": "CPH2653EEA",
-          "versionLetter": "F"
-        }
-      ]
-    }
+    ]
   },
   {
     "name": "OnePlus 13T",
@@ -160,11 +102,7 @@
         "displayName": "CN",
         "productModel": "PKX110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 15": "A",
-      "Android 16": "C"
-    }
+    ]
   },
   {
     "name": "OnePlus 13R/Ace 5",
@@ -187,30 +125,7 @@
         "displayName": "CN",
         "productModel": "PKG110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 15": "A",
-      "Android 16": "F",
-      "Android 17": [
-        {
-          "displayName": "IN",
-          "productModel": "CPH2691",
-          "productName": "CPH2691IN",
-          "versionLetter": "H"
-        },
-        {
-          "displayName": "GLO",
-          "productModel": "CPH2645",
-          "versionLetter": "H"
-        },
-        {
-          "displayName": "EU",
-          "productModel": "CPH2645",
-          "productName": "CPH2645EEA",
-          "versionLetter": "H"
-        }
-      ]
-    }
+    ]
   },
   {
     "name": "OnePlus 13",
@@ -233,34 +148,7 @@
         "displayName": "CN",
         "productModel": "PJZ110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 15": "A",
-      "Android 16": [
-        {
-          "displayName": "IN",
-          "productModel": "CPH2649",
-          "productName": "CPH2649IN",
-          "versionLetter": "F"
-        },
-        {
-          "displayName": "GLO",
-          "productModel": "CPH2653",
-          "versionLetter": "F"
-        },
-        {
-          "displayName": "EU",
-          "productModel": "CPH2653",
-          "productName": "CPH2653EEA",
-          "versionLetter": "F"
-        },
-        {
-          "displayName": "CN",
-          "productModel": "PJZ110",
-          "versionLetter": "C"
-        }
-      ]
-    }
+    ]
   },
   {
     "name": "OnePlus 12R/Ace 3",
@@ -288,12 +176,7 @@
         "productModel": "PJE110YS",
         "productName": "PJE110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 14": "A",
-      "Android 15": "C",
-      "Android 16": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus 12",
@@ -316,12 +199,7 @@
         "displayName": "CN",
         "productModel": "PJD110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 14": "A",
-      "Android 15": "C",
-      "Android 16": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus 11R/Ace 2",
@@ -339,13 +217,7 @@
         "productModel": "PHK110YS",
         "productName": "PHK110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 13": "A",
-      "Android 14": "C",
-      "Android 15": "F",
-      "Android 16": "H"
-    }
+    ]
   },
   {
     "name": "OnePlus 11",
@@ -367,13 +239,7 @@
         "displayName": "CN",
         "productModel": "PHB110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 13": "A",
-      "Android 14": "C",
-      "Android 15": "F",
-      "Android 16": "H"
-    }
+    ]
   },
   {
     "name": "OnePlus 10T/Ace Pro",
@@ -395,13 +261,7 @@
         "displayName": "CN",
         "productModel": "PGP110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 12": "A",
-      "Android 13": "C",
-      "Android 14": "F",
-      "Android 15": "H"
-    }
+    ]
   },
   {
     "name": "OnePlus 10R 80W",
@@ -414,12 +274,7 @@
         "displayName": "CN",
         "productModel": "PGKM10"
       }
-    ],
-    "firmwareGroups": {
-      "Android 13": "C",
-      "Android 14": "F",
-      "Android 15": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus 10R 150W",
@@ -428,12 +283,7 @@
         "displayName": "IN",
         "productModel": "CPH2411"
       }
-    ],
-    "firmwareGroups": {
-      "Android 13": "C",
-      "Android 14": "F",
-      "Android 15": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus 10 Pro",
@@ -455,25 +305,16 @@
         "displayName": "CN",
         "productModel": "NE2210"
       }
-    ],
-    "firmwareGroups": {
-      "Android 12": "A",
-      "Android 13": "C",
-      "Android 14": "F",
-      "Android 15": "H",
-      "Android 16": "J"
-    }
+    ]
   },
   {
     "name": "OnePlus Ace 6",
-    "firmwareGroups": {
-      "Android 16": [
-        {
-          "displayName": "CN",
-          "productModel": "PLQ110"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "CN",
+        "productModel": "PLQ110"
+      }
+    ]
   },
   {
     "name": "OnePlus Ace 5 Pro",
@@ -482,11 +323,7 @@
         "displayName": "CN",
         "productModel": "PKR110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 15": "A",
-      "Android 16": "C"
-    }
+    ]
   },
   {
     "name": "OnePlus Ace 3V",
@@ -495,12 +332,7 @@
         "displayName": "CN",
         "productModel": "PJF110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 14": "A",
-      "Android 15": "C",
-      "Android 16": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus Ace 3 Pro",
@@ -509,12 +341,7 @@
         "displayName": "CN",
         "productModel": "PJX110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 14": "A",
-      "Android 15": "C",
-      "Android 16": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus Ace 2V",
@@ -523,13 +350,7 @@
         "displayName": "CN",
         "productModel": "PHP110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 13": "A",
-      "Android 14": "C",
-      "Android 15": "F",
-      "Android 16": "H"
-    }
+    ]
   },
   {
     "name": "OnePlus Ace 2 Pro",
@@ -538,13 +359,7 @@
         "displayName": "CN",
         "productModel": "PJA110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 13": "A",
-      "Android 14": "C",
-      "Android 15": "F",
-      "Android 16": "H"
-    }
+    ]
   },
   {
     "name": "OnePlus Ace Racing Edition",
@@ -553,13 +368,7 @@
         "displayName": "CN",
         "productModel": "PGZ110"
       }
-    ],
-    "firmwareGroups": {
-      "Android 12": "A",
-      "Android 13": "C",
-      "Android 14": "F",
-      "Android 15": "H"
-    }
+    ]
   },
   {
     "name": "OnePlus Nord CE 5",
@@ -578,51 +387,41 @@
         "productModel": "CPH2719",
         "productName": "CPH2719EEA"
       }
-    ],
-    "firmwareGroups": {
-      "Android 15": "A",
-      "Android 16": "C"
-    }
+    ]
   },
   {
     "name": "OnePlus Nord CE 6",
-    "firmwareGroups": {
-      "Android 16": [
-        {
-          "displayName": "GLO",
-          "productModel": "CPH2807"
-        },
-        {
-          "displayName": "IN",
-          "productModel": "CPH2805",
-          "productName": "CPH2805IN"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "GLO",
+        "productModel": "CPH2807"
+      },
+      {
+        "displayName": "IN",
+        "productModel": "CPH2805",
+        "productName": "CPH2805IN"
+      }
+    ]
   },
   {
     "name": "OnePlus Nord CE 6 Lite",
-    "firmwareGroups": {
-      "Android 16": [
-        {
-          "displayName": "IN",
-          "productModel": "CPH2943",
-          "productName": "CPH2943IN"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "IN",
+        "productModel": "CPH2943",
+        "productName": "CPH2943IN"
+      }
+    ]
   },
   {
     "name": "OnePlus N6",
-    "firmwareGroups": {
-      "Android 16": [
-        {
-          "displayName": "IN",
-          "productModel": "CPH2955",
-          "productName": "CPH2955IN"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "IN",
+        "productModel": "CPH2955",
+        "productName": "CPH2955IN"
+      }
+    ]
   },
   {
     "name": "OnePlus Nord CE 4 Lite",
@@ -641,12 +440,7 @@
         "productModel": "CPH2621",
         "productName": "CPH2621EEA"
       }
-    ],
-    "firmwareGroups": {
-      "Android 14": "A",
-      "Android 15": "C",
-      "Android 16": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus Nord CE 4",
@@ -656,12 +450,7 @@
         "productModel": "CPH2613",
         "productName": "CPH2613IN"
       }
-    ],
-    "firmwareGroups": {
-      "Android 14": "A",
-      "Android 15": "C",
-      "Android 16": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus Nord CE 3 Lite",
@@ -679,12 +468,7 @@
         "productModel": "CPH2465",
         "productName": "CPH2465EEA"
       }
-    ],
-    "firmwareGroups": {
-      "Android 13": "A",
-      "Android 14": "C",
-      "Android 15": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus Nord CE 3",
@@ -693,12 +477,7 @@
         "displayName": "IN",
         "productModel": "CPH2569"
       }
-    ],
-    "firmwareGroups": {
-      "Android 13": "A",
-      "Android 14": "C",
-      "Android 15": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus Nord 5",
@@ -717,27 +496,21 @@
         "productModel": "CPH2709",
         "productName": "CPH2709EEA"
       }
-    ],
-    "firmwareGroups": {
-      "Android 15": "A",
-      "Android 16": "C"
-    }
+    ]
   },
   {
     "name": "OnePlus Nord 6",
-    "firmwareGroups": {
-      "Android 16": [
-        {
-          "displayName": "IN",
-          "productModel": "CPH2793",
-          "productName": "CPH2793IN"
-        },
-        {
-          "displayName": "GLO",
-          "productModel": "CPH2795"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "IN",
+        "productModel": "CPH2793",
+        "productName": "CPH2793IN"
+      },
+      {
+        "displayName": "GLO",
+        "productModel": "CPH2795"
+      }
+    ]
   },
   {
     "name": "OnePlus Nord 4",
@@ -756,12 +529,7 @@
         "productModel": "CPH2663",
         "productName": "CPH2663EEA"
       }
-    ],
-    "firmwareGroups": {
-      "Android 14": "A",
-      "Android 15": "C",
-      "Android 16": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus Nord 3",
@@ -779,55 +547,45 @@
         "productModel": "CPH2493",
         "productName": "CPH2493EEA"
       }
-    ],
-    "firmwareGroups": {
-      "Android 13": "A",
-      "Android 14": "C",
-      "Android 15": "F",
-      "Android 16": "H"
-    }
+    ]
   },
   {
     "name": "OnePlus Pad Go 2 5G",
-    "firmwareGroups": {
-      "Android 16": [
-        {
-          "displayName": "IN",
-          "productModel": "OPD2505",
-          "productName": "OPD2505IN"
-        },
-        {
-          "displayName": "GLO",
-          "productModel": "OPD2505"
-        },
-        {
-          "displayName": "EU",
-          "productModel": "OPD2505",
-          "productName": "OPD2505EEA"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "IN",
+        "productModel": "OPD2505",
+        "productName": "OPD2505IN"
+      },
+      {
+        "displayName": "GLO",
+        "productModel": "OPD2505"
+      },
+      {
+        "displayName": "EU",
+        "productModel": "OPD2505",
+        "productName": "OPD2505EEA"
+      }
+    ]
   },
   {
     "name": "OnePlus Pad Go 2 WiFi",
-    "firmwareGroups": {
-      "Android 16": [
-        {
-          "displayName": "IN",
-          "productModel": "OPD2504",
-          "productName": "OPD2504IN"
-        },
-        {
-          "displayName": "GLO",
-          "productModel": "OPD2504"
-        },
-        {
-          "displayName": "EU",
-          "productModel": "OPD2504",
-          "productName": "OPD2504EEA"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "IN",
+        "productModel": "OPD2504",
+        "productName": "OPD2504IN"
+      },
+      {
+        "displayName": "GLO",
+        "productModel": "OPD2504"
+      },
+      {
+        "displayName": "EU",
+        "productModel": "OPD2504",
+        "productName": "OPD2504EEA"
+      }
+    ]
   },
   {
     "name": "OnePlus Pad Pro",
@@ -836,28 +594,21 @@
         "displayName": "CN",
         "productModel": "OPD2404"
       }
-    ],
-    "firmwareGroups": {
-      "Android 14": "A",
-      "Android 15": "C",
-      "Android 16": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus Pad 4",
-    "firmwareGroups": {
-      "Android 16": [
-        {
-          "displayName": "GLO",
-          "productModel": "OPD2514"
-        },
-        {
-          "displayName": "IN",
-          "productModel": "OPD2514",
-          "productName": "OPD2514IN"
-        }
-      ]
-    }
+    "variants": [
+      {
+        "displayName": "GLO",
+        "productModel": "OPD2514"
+      },
+      {
+        "displayName": "IN",
+        "productModel": "OPD2514",
+        "productName": "OPD2514IN"
+      }
+    ]
   },
   {
     "name": "OnePlus Pad 3",
@@ -876,11 +627,7 @@
         "productModel": "OPD2415",
         "productName": "OPD2415EEA"
       }
-    ],
-    "firmwareGroups": {
-      "Android 15": "A",
-      "Android 16": "C"
-    }
+    ]
   },
   {
     "name": "OnePlus Pad 2 Pro",
@@ -889,11 +636,7 @@
         "displayName": "CN",
         "productModel": "OPD2413"
       }
-    ],
-    "firmwareGroups": {
-      "Android 15": "A",
-      "Android 16": "C"
-    }
+    ]
   },
   {
     "name": "OnePlus Pad 2",
@@ -912,12 +655,7 @@
         "productModel": "OPD2403",
         "productName": "OPD2403EEA"
       }
-    ],
-    "firmwareGroups": {
-      "Android 14": "A",
-      "Android 15": "C",
-      "Android 16": "F"
-    }
+    ]
   },
   {
     "name": "OnePlus Pad",
@@ -935,13 +673,7 @@
         "productModel": "OPD2203",
         "productName": "OPD2203EEA"
       }
-    ],
-    "firmwareGroups": {
-      "Android 13": "A",
-      "Android 14": "C",
-      "Android 15": "F",
-      "Android 16": "H"
-    }
+    ]
   },
   {
     "name": "OnePlus Open",
@@ -956,11 +688,6 @@
         "productModel": "CPH2551",
         "productName": "CPH2551EEA"
       }
-    ],
-    "firmwareGroups": {
-      "Android 13": "A",
-      "Android 14": "C",
-      "Android 15": "F"
-    }
+    ]
   }
 ]
