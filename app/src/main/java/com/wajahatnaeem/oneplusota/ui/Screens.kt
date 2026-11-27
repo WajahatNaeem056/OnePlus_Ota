@@ -111,7 +111,7 @@ fun UpdateTab(vm: OtaViewModel) {
 
         if (!vm.device.isOnePlus) {
             item {
-                Card(Modifier.fillMaxWidth()) {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                     Text("This app only works on OnePlus devices. Detected manufacturer: ${vm.device.manufacturer}",
                         Modifier.padding(16.dp))
                 }
@@ -160,7 +160,7 @@ fun OtherTab(vm: OtaViewModel) {
             if (vm.catalogLoading) item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
             vm.catalogError?.let { e ->
                 item {
-                    Card(Modifier.fillMaxWidth()) {
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(e, color = MaterialTheme.colorScheme.error)
                             OutlinedButton(onClick = vm::reloadCatalog) { Text("Retry") }
@@ -190,7 +190,7 @@ fun OtherTab(vm: OtaViewModel) {
         } else {
             item { OutlinedButton(onClick = { vm.select(null) }) { Text("← Back to list") } }
             item {
-                Card(Modifier.fillMaxWidth()) {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         vm.variant?.let { v ->
                             Text("${sel.name} (${v.code})", style = MaterialTheme.typography.titleMedium)
@@ -344,7 +344,7 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedA
             }
             is CheckResult.NoPackage, is CheckResult.Failed -> {
                 val notes = if (r is CheckResult.NoPackage) r.notes else (r as CheckResult.Failed).notes
-                Card(Modifier.fillMaxWidth()) {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(if (r is CheckResult.NoPackage) "No full package found" else "All sources failed",
                             style = MaterialTheme.typography.titleMedium)
@@ -360,7 +360,7 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedA
 @Composable
 private fun DownloadCard(vm: OtaViewModel, s: DlState) {
     if (s is DlState.Idle) return
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             when (s) {
                 is DlState.Active -> {
