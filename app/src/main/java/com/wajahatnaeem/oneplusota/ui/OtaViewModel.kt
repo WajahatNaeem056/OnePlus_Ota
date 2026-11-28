@@ -7,6 +7,7 @@ import android.content.ContentValues
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -39,6 +40,18 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
     private val store = DownloadStore(app)
     val device = DeviceReader.read()
     val dl = DownloadCenter.state
+
+    // ---- settings (kept on the phone) ------------------------------------------------------------
+    private val prefs = app.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+    /** 0 = follow the system, 1 = light, 2 = dark */
+    var themeMode by mutableIntStateOf(prefs.getInt("theme", 0))
+        private set
+    /** Off by default: the update check only runs when the button is pressed. */
+    var autoCheck by mutableStateOf(prefs.getBoolean("auto_check", false))
+        private set
+
+    fun setTheme(mode: Int) { themeMode = mode; prefs.edit().putInt("theme", mode).apply() }
+    fun setAutoCheck(on: Boolean) { autoCheck = on; prefs.edit().putBoolean("auto_check", on).apply() }
 
     /** null = auto-detect */
     var regionId by mutableStateOf<Int?>(null)
@@ -84,7 +97,11 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    init { DownloadCenter.restore(store) }
+    init {
+        DownloadCenter.restore(store)
+        // Only when the person turned "Auto check for updates" on in Settings.
+        if (device.isOnePlus && autoCheck) checkUpdate()
+    }
 
     fun setRegion(id: Int?) { regionId = id }
 

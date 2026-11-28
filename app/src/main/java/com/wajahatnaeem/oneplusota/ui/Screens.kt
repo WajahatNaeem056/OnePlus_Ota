@@ -221,6 +221,43 @@ fun OtherTab(vm: OtaViewModel) {
 }
 
 // =================================================================================================
+// Tab 3: Settings
+// =================================================================================================
+@Composable
+fun SettingsTab(vm: OtaViewModel) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 104.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp, start = 4.dp)) }
+        item {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(0 to "System", 1 to "Light", 2 to "Dark").forEach { (mode, label) ->
+                            FilterChip(selected = vm.themeMode == mode, onClick = { vm.setTheme(mode) }, label = { Text(label) })
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Auto check for updates", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                        Text("Check by itself when the app opens. When off, it checks only when you press Check for update.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(checked = vm.autoCheck, onCheckedChange = { vm.setAutoCheck(it) })
+                }
+            }
+        }
+    }
+}
+
+// =================================================================================================
 // Shared cards
 // =================================================================================================
 @Composable

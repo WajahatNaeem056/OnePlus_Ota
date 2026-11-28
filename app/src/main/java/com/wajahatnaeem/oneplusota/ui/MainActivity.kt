@@ -34,6 +34,9 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -49,7 +52,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            val dark = isSystemInDarkTheme()
+            val dark = when (vm.themeMode) { 1 -> false; 2 -> true; else -> isSystemInDarkTheme() }
+            val view = LocalView.current
+            // Keep status / navigation bar icons readable when the app theme differs from the system theme.
+            SideEffect {
+                val c = WindowCompat.getInsetsController(window, view)
+                c.isAppearanceLightStatusBars = !dark
+                c.isAppearanceLightNavigationBars = !dark
+            }
             val ctx = LocalContext.current
             val scheme = when {
                 Build.VERSION.SDK_INT >= 31 -> if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
@@ -75,10 +85,14 @@ private fun Root(vm: OtaViewModel) {
             detectHorizontalDragGestures(
                 onDragStart = { total = 0f },
                 onHorizontalDrag = { _, dx -> total += dx },
-                onDragEnd = { if (total < -threshold) tab = 1 else if (total > threshold) tab = 0 },
+                onDragEnd = { if (total < -threshold) tab = (tab + 1).coerceAtMost(2) else if (total > threshold) tab = (tab - 1).coerceAtLeast(0) },
             )
         }) {
-            if (tab == 0 || !vm.device.isOnePlus) UpdateTab(vm) else OtherTab(vm)
+            when {
+                tab == 0 || !vm.device.isOnePlus -> UpdateTab(vm)
+                tab == 1 -> OtherTab(vm)
+                else -> SettingsTab(vm)
+            }
         }
         if (vm.device.isOnePlus) Box(Modifier.align(Alignment.BottomCenter)) { FloatingBar(tab) { tab = it } }
     }
@@ -91,6 +105,7 @@ private fun FloatingBar(selected: Int, onSelect: (Int) -> Unit) {
             Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 BarItem(0, selected, AppIcons.SystemUpdate, "My phone", onSelect)
                 BarItem(1, selected, AppIcons.Devices, "Devices", onSelect)
+                BarItem(2, selected, AppIcons.Settings, "Settings", onSelect)
             }
         }
     }
@@ -102,10 +117,11 @@ private fun BarItem(index: Int, selected: Int, icon: ImageVector, label: String,
     val bg = if (on) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
     val fg = if (on) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
     Row(
-        Modifier.clip(RoundedCornerShape(24.dp)).background(bg).clickable { onSelect(index) }.padding(horizontal = 20.dp, vertical = 11.dp),
+        Modifier.clip(RoundedCornerShape(24.dp)).background(bg).clickable { onSelect(index) }.padding(horizontal = if (on) 20.dp else 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
-        Text(label, color = fg, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal)
+        Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(20.dp))
+        // Three tabs would not fit with all labels, so only the selected one shows its name.
+        if (on) Text(label, color = fg, fontWeight = FontWeight.SemiBold)
     }
 }
