@@ -32,7 +32,25 @@ class OplusClient(private val http: OkHttpClient) {
         when (dev.regionId) { 1 -> "10010111"; 3 -> "01000100"; else -> "00011011" }
     }
 
+    private class RetryableServerError(message: String) : Exception(message)
+
+    private fun clean(text: String, max: Int = 160) =
+        text.substringBefore("at [Source").filter { it.code in 32..126 }.trim().take(max)
+
     fun query(dev: DeviceInfo, server: OplusServers.Server, otaVersion: String): JSONObject {
+        var last: RetryableServerError? = null
+        for (attempt in 1..MAX_ATTEMPTS) {
+            try {
+                return queryOnce(dev, server, otaVersion)
+            } catch (e: RetryableServerError) {
+                last = e
+                if (attempt < MAX_ATTEMPTS) Thread.sleep(300L * attempt)
+            }
+        }
+        error("${last?.message} (failed $MAX_ATTEMPTS times)")
+    }
+
+    private fun queryOnce(dev: DeviceInfo, server: OplusServers.Server, otaVersion: String): JSONObject {
         // A device is only ever asked about on its own region's gateway; never send region A's identity to gateway B.
         require(server.id == dev.regionId) { "Refusing cross-region query: device region ${dev.regionId} -> ${server.name} gateway" }
         val now = System.currentTimeMillis()
@@ -75,12 +93,16 @@ class OplusClient(private val http: OkHttpClient) {
 
         http.newCall(req).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) error("HTTP ${resp.code} from ${server.name} gateway: ${text.take(120)}")
-            val outer = JSONObject(text)
-            val enc = findCipherObject(outer) ?: error(
-                "Unexpected response shape (keys=${outer.keys().asSequence().toList()}, " +
-                    "code=${outer.opt("responseCode")}, errMsg=${outer.optString("errMsg")}): ${text.take(160)}",
-            )
+            if (!resp.isSuccessful) error("HTTP ${resp.code} from ${server.name} gateway: ${clean(text, 120)}")
+            val outer = runCatching { JSONObject(text) }
+                .getOrElse { error("Non-JSON reply from ${server.name} gateway: ${clean(text, 120)}") }
+            val enc = findCipherObject(outer)
+            if (enc == null) {
+                val code = outer.opt("responseCode")
+                val detail = "code=$code, errMsg=${clean(outer.optString("errMsg"))}"
+                if (code.toString() == "500") throw RetryableServerError("${server.name} gateway: $detail")
+                error("Unexpected response shape (keys=${outer.keys().asSequence().toList()}, $detail)")
+            }
             val plain = OplusCrypto.decrypt(enc.getString("cipher"), enc.getString("iv"), session)
             lastRawJson = plain
             Log.d("OplusClient", "decrypted: ${plain.take(400)}")
@@ -170,7 +192,10 @@ class OplusClient(private val http: OkHttpClient) {
         return best
     }
 
-    companion object { const val FULL_MIN_BYTES = 2_000_000_000L }
+    companion object {
+        const val FULL_MIN_BYTES = 2_000_000_000L
+        private const val MAX_ATTEMPTS = 3
+    }
 }
 
 internal val REGION_SUFFIXES = listOf("EEA", "IN", "RU", "TR", "CN", "EU", "TW", "MEA", "SA", "SG", "TH", "LATAM", "BR", "MY", "ID", "KZ", "OCA", "VN", "GLO", "PH", "LK")
@@ -266,6 +291,7 @@ private suspend fun resolveOnce(
             }
         }.awaitAll()
         if (probes.any { it.err == null }) sawResponse = true
+        val failed = probes.count { it.err != null }
         val fulls = probes.filter { it.pkg != null && (!fullOnly || it.pkg.isFull) }
         val best = fulls.reduceOrNull { x, y -> if (isNewerVersion(y.pkg!!.version, x.pkg!!.version)) y else x }
         if (best != null) {
@@ -277,6 +303,7 @@ private suspend fun resolveOnce(
             val desc = probes.firstNotNullOfOrNull { it.desc }
             if (desc != null) errors += "${server.name}: no package ($desc)"
             probes.mapNotNull { it.err }.distinct().take(2).forEach { errors += "${server.name}: $it" }
+            if (failed > 0) errors += "${server.name}: $failed of ${probes.size} requests failed"
         }
     }
     val msg = errors.joinToString("; ")

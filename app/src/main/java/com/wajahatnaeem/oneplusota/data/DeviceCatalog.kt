@@ -53,15 +53,13 @@ class DeviceCatalog(private val http: OkHttpClient) {
 
     suspend fun load(cache: File, bundled: () -> String): Result<List<CatalogDevice>> = withContext(Dispatchers.IO) {
         runCatching {
-            val text = try {
+            val remote = runCatching {
                 http.newCall(Request.Builder().url(url).build()).execute().use { r ->
                     if (!r.isSuccessful) error("HTTP ${r.code}")
-                    r.body!!.string().also { cache.writeText(it) }
+                    r.body!!.string()
                 }
-            } catch (e: Exception) {
-                if (cache.exists()) cache.readText() else bundled() // offline -> last cached copy -> copy shipped in the app
-            }
-            parse(text)
+            }.mapCatching { text -> parse(text).also { cache.writeText(text) } }
+            remote.getOrNull() ?: runCatching { parse(cache.readText()) }.getOrNull() ?: parse(bundled())
         }
     }
 
