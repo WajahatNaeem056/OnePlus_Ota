@@ -172,7 +172,7 @@ fun ExtractTab(evm: ExtractViewModel = viewModel()) {
         }
 
         // ---- output folder ----
-        item { OutputCard(ctx) }
+        item { OutputCard() }
     }
 
     evm.sheet?.let { s ->
@@ -231,8 +231,13 @@ private fun StatusCard(evm: ExtractViewModel, info: WorkInfo?) {
             )
             OutlinedButton(onClick = { evm.cancel() }, shape = RoundedCornerShape(20.dp)) { Text("Cancel") }
         } else {
-            if (state == WorkInfo.State.SUCCEEDED && outDir != null)
-                Text("Saved to $outDir", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (state == WorkInfo.State.SUCCEEDED && outDir != null) {
+                val ctx = LocalContext.current
+                Text("Saved to $outDir", fontSize = 13.sp)
+                FilledTonalButton(onClick = {
+                    runCatching { ctx.startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                }, shape = RoundedCornerShape(20.dp)) { Text("Open Downloads") }
+            }
             if (state == WorkInfo.State.FAILED && error != null)
                 Text(error, fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
             FilledTonalButton(onClick = { evm.dismissStatus() }, shape = RoundedCornerShape(20.dp)) { Text("Dismiss") }
@@ -241,23 +246,12 @@ private fun StatusCard(evm: ExtractViewModel, info: WorkInfo?) {
 }
 
 @Composable
-private fun OutputCard(ctx: Context) {
-    var granted by remember { mutableStateOf(ExtractPaths.hasAllFilesAccess()) }
-    val settings = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        granted = ExtractPaths.hasAllFilesAccess()
-    }
+private fun OutputCard() {
     ExtractCard {
-        Text("Output folder", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-        Text(ExtractPaths.extractedDir(ctx).absolutePath, fontFamily = FontFamily.Monospace, fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !granted) {
-            Text("Without all-files access the images go to the app's own folder, which file managers can't open on newer Android.",
-                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            FilledTonalButton(onClick = {
-                val i = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${ctx.packageName}"))
-                settings.launch(i)
-            }, shape = RoundedCornerShape(20.dp)) { Text("Allow all-files access") }
-        }
+        Text("Where do the files go?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+        Text("Finished images are saved in your phone's Downloads folder, under OnePlusOTA, in a folder named after the OTA. " +
+            "Open the Files or Downloads app to find them.",
+            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -291,7 +285,7 @@ private fun PartitionPicker(sheet: PartitionSheet, onDismiss: () -> Unit, onExtr
                         Checkbox(checked = on, onCheckedChange = { toggle() })
                         Column(Modifier.weight(1f)) {
                             Text(p.name, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold)
-                            Text("${p.formattedSize} · ${p.opCount} ops", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(p.formattedSize, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }

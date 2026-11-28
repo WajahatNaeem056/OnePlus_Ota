@@ -65,7 +65,11 @@ class ExtractViewModel(private val app: Application) : AndroidViewModel(app) {
             try {
                 val session = extractor.open(source)
                 val list = extractor.listPartitions(session)
-                sheet = PartitionSheet(source, versionName, list)
+                // Links often end in a random hash, so prefer the real build id from the zip when there is one.
+                val nice = if (source.startsWith("http", ignoreCase = true))
+                    session.metadataMap.otaId.takeIf { it.isNotBlank() } ?: versionName
+                else versionName
+                sheet = PartitionSheet(source, nice, list)
             } catch (e: Exception) {
                 message = "Could not read partitions: ${e.message ?: "unknown error"}"
             } finally {

@@ -2,9 +2,11 @@ package com.wajahatnaeem.oneplusota.extract
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.ServiceInfo
-import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
@@ -49,7 +51,7 @@ class PartitionExtractorWorker(
         if (partitionNames.isEmpty()) return@withContext Result.failure()
 
         val versionName = sanitize(inputData.getString(KEY_VERSION_NAME) ?: "Unknown")
-        val extractedDir = ExtractPaths.extractedDir(applicationContext).also { it.mkdirs() }
+        val extractedDir = ExtractPaths.workDir(applicationContext)
         val targetFolder = File(extractedDir, versionName).also { it.mkdirs() }
 
         val titleName = if (partitionNames.size == 1) partitionNames[0] else "${partitionNames.size} partitions"
@@ -76,11 +78,17 @@ class PartitionExtractorWorker(
                 } finally {
                     session.sourceFile = null
                 }
-            }
 
-            setProgress(workDataOf(PROGRESS_KEY to 100, OUTPUT_DIR_KEY to targetFolder.absolutePath))
-            showResultNotification("Extraction complete", "$titleName saved to ${targetFolder.absolutePath}", 1)
-            Result.success(workDataOf(OUTPUT_DIR_KEY to targetFolder.absolutePath))
+                // Move the finished image to public Downloads so the user can actually find it.
+                runCatching { setForeground(createForegroundInfo(titleName, ((index + 1) * 100) / total, "Saving $partitionName to Downloads")) }
+                exportToDownloads(outputFile, versionName)
+            }
+            targetFolder.delete() // only removes the scratch folder if it is empty
+
+            val where = ExtractPaths.downloadsHint(versionName)
+            setProgress(workDataOf(PROGRESS_KEY to 100, OUTPUT_DIR_KEY to where))
+            showResultNotification("Extraction complete", "$titleName saved to $where", 1)
+            Result.success(workDataOf(OUTPUT_DIR_KEY to where))
         } catch (e: CancellationException) {
             partitionNames.forEach { otaExtractor.clearExtractionState(it) }
             showResultNotification("Extraction cancelled", titleName, 3)
@@ -135,6 +143,36 @@ class PartitionExtractorWorker(
             .build()
         (applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
             .notify(NOTIFICATION_ID + offset, n)
+    }
+
+    /** Copies [file] into Downloads/OnePlusOTA/[folder] (no storage permission needed), then deletes the scratch copy. */
+    private fun exportToDownloads(file: File, folder: String) {
+        val resolver = applicationContext.contentResolver
+        val relative = "${Environment.DIRECTORY_DOWNLOADS}/${ExtractPaths.ROOT_DIR}/$folder"
+        // Re-extracting the same partition replaces the old file instead of making "abl (1).img".
+        runCatching {
+            resolver.delete(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                "${MediaStore.Downloads.DISPLAY_NAME}=? AND ${MediaStore.Downloads.RELATIVE_PATH}=?",
+                arrayOf(file.name, "$relative/"),
+            )
+        }
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, file.name)
+            put(MediaStore.Downloads.MIME_TYPE, "application/octet-stream")
+            put(MediaStore.Downloads.RELATIVE_PATH, relative)
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: error("Could not create ${file.name} in Downloads")
+        try {
+            resolver.openOutputStream(uri)!!.use { out -> file.inputStream().use { it.copyTo(out, 1 shl 16) } }
+            resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+        } catch (e: Exception) {
+            resolver.delete(uri, null, null)
+            throw e
+        }
+        file.delete()
     }
 
     private fun sanitize(value: String): String =
