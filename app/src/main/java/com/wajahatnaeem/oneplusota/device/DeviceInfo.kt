@@ -31,6 +31,8 @@ data class DeviceInfo(
     val nvId: String = "",
     /** Catalog devices: try every build letter and keep the newest full package. */
     val probe: Boolean = false,
+    /** Full OS version as the phone's own updater shows it, e.g. CPH2691_17.0.0.105(EX01C30P01). Blank = unknown. */
+    val fullOsVersion: String = "",
 ) {
     val isOnePlus: Boolean
         get() = manufacturer.equals("OnePlus", true) || Build.BRAND.equals("OnePlus", true)
@@ -40,6 +42,7 @@ data class DeviceInfo(
         .put("androidRelease", androidRelease).put("osVersion", osVersion)
         .put("fingerprint", fingerprint).put("regionId", regionId)
         .put("displayVersion", displayVersion).put("reqMode", reqMode).put("nvId", nvId)
+        .put("fullOsVersion", fullOsVersion)
 
     companion object {
         fun fromJson(o: JSONObject) = DeviceInfo(
@@ -49,6 +52,7 @@ data class DeviceInfo(
             o.optString("displayVersion"),
             o.optString("reqMode").ifBlank { "manual" },
             o.optString("nvId"),
+            fullOsVersion = o.optString("fullOsVersion"),
         )
     }
 }
@@ -84,6 +88,8 @@ object DeviceReader {
             regionId = region,
             displayVersion = SysProps.get("ro.build.display.id").ifBlank { SysProps.get("ro.build.display.ota") }.ifBlank { Build.DISPLAY },
             nvId = SysProps.get("ro.build.oplus_nv_id"),
+            // Same source Oxygen Updater uses: this prop = Build.DISPLAY + SOTA info, e.g. CPH2691_17.0.0.105(EX01C30P01).
+            fullOsVersion = SysProps.get("persist.sys.oplus.ota_ver_display").ifBlank { Build.DISPLAY },
         )
     }
 }

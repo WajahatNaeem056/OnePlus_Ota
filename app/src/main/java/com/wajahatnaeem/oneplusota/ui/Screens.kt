@@ -7,6 +7,8 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -101,8 +103,12 @@ fun UpdateTab(vm: OtaViewModel) {
                             Chip("Region ${regionName(vm.device.regionId)}")
                         }
                         Column {
-                            Text("Current version", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(vm.device.displayVersion.ifBlank { "unknown" }, fontFamily = FontFamily.Monospace, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text("OS version", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(vm.device.fullOsVersion.ifBlank { vm.device.displayVersion }.ifBlank { "unknown" }, fontFamily = FontFamily.Monospace, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        }
+                        Column {
+                            Text("OTA version", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(vm.device.otaVersion.ifBlank { "unknown" }, fontFamily = FontFamily.Monospace, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
@@ -126,7 +132,7 @@ fun UpdateTab(vm: OtaViewModel) {
                 Text(if (vm.check is CheckUi.Result) "Check again" else "Check for update")
             }
         }
-        item { CheckCard(vm, vm.check, false, vm.checkedAt) { start(it, vm.updateSpec) } }
+        item { CheckCard(vm, vm.check, false, vm.checkedAt, current = vm.device) { start(it, vm.updateSpec) } }
         item { DownloadCard(vm, dl) }
         vm.message?.let { m -> item { Text(m, color = MaterialTheme.colorScheme.primary) } }
         item { androidx.compose.foundation.layout.Spacer(Modifier.padding(8.dp)) }
@@ -297,7 +303,27 @@ private fun FoldCard(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedAt: Long, onDownload: (OtaPackage) -> Unit) {
+private enum class UpdateState { UpToDate, Available, Unknown }
+
+/** First number group of a version like CPH2691_17.0.0.105(EX01C30P01) -> [17, 0, 0, 105]. The "(EX01...)" tail is ignored. */
+private fun versionCore(v: String): List<Long> =
+    Regex("\\d+").findAll(v.substringAfter('_').substringBefore('(')).map { it.value.toLongOrNull() ?: 0L }.toList()
+
+/** Is the newest full package newer than what this phone runs? Unknown when either side has no readable version. */
+private fun updateState(dev: DeviceInfo, pkg: OtaPackage): UpdateState {
+    if (pkg.otaVersion?.equals(dev.otaVersion, ignoreCase = true) == true) return UpdateState.UpToDate
+    val cur = versionCore(dev.fullOsVersion.ifBlank { dev.displayVersion })
+    val new = versionCore(pkg.version)
+    if (cur.isEmpty() || new.isEmpty()) return UpdateState.Unknown
+    for (i in 0 until maxOf(cur.size, new.size)) {
+        val c = cur.getOrElse(i) { 0L }; val n = new.getOrElse(i) { 0L }
+        if (n != c) return if (n > c) UpdateState.Available else UpdateState.UpToDate
+    }
+    return UpdateState.UpToDate
+}
+
+@Composable
+private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedAt: Long, current: DeviceInfo? = null, onDownload: (OtaPackage) -> Unit) {
     val ctx = LocalContext.current
     when (state) {
         CheckUi.Idle -> {}
@@ -307,14 +333,22 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedA
                 var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
                 LaunchedEffect(checkedAt) { now = System.currentTimeMillis(); while (true) { delay(20_000); now = System.currentTimeMillis() } }
                 val inner = MaterialTheme.colorScheme.surfaceContainerLow
+                val us = if (other || current == null) UpdateState.Unknown else updateState(current, r.pkg)
+                val green = if (isSystemInDarkTheme()) Color(0xFF81C995) else Color(0xFF1E8E3E)
+                val headColor = if (us == UpdateState.UpToDate) green else MaterialTheme.colorScheme.primary
+                val headText = when (us) {
+                    UpdateState.UpToDate -> "Your system is up to date"
+                    UpdateState.Available -> "System update available"
+                    UpdateState.Unknown -> "Update found"
+                }
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(AppIcons.CheckCircle, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+                            Icon(AppIcons.CheckCircle, null, Modifier.size(22.dp), tint = headColor)
                             Spacer(Modifier.width(10.dp))
-                            Text("Update found", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                            Text(headText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                                color = headColor, modifier = Modifier.weight(1f))
                             if (checkedAt > 0) Text(agoLabel(checkedAt, now), style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }

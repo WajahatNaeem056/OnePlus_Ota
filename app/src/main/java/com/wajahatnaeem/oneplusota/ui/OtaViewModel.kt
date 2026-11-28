@@ -84,7 +84,11 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    init { DownloadCenter.restore(store) }
+    init {
+        DownloadCenter.restore(store)
+        // Like the system updater: check by itself when the app opens, so "up to date" / "update available" is already there.
+        if (device.isOnePlus) checkUpdate()
+    }
 
     fun setRegion(id: Int?) { regionId = id }
 
