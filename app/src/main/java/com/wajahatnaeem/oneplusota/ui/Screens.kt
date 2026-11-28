@@ -43,6 +43,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -232,9 +233,13 @@ fun SettingsTab(vm: OtaViewModel) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(0 to "System", 1 to "Light", 2 to "Dark").forEach { (mode, label) ->
-                            FilterChip(selected = vm.themeMode == mode, onClick = { vm.setTheme(mode) }, label = { Text(label) })
+                    Column {
+                        listOf(0 to "System default", 1 to "Light", 2 to "Dark").forEach { (mode, name) ->
+                            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { vm.setTheme(mode) },
+                                verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = vm.themeMode == mode, onClick = { vm.setTheme(mode) })
+                                Text(name, style = MaterialTheme.typography.bodyLarge)
+                            }
                         }
                     }
                 }
