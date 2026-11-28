@@ -1,0 +1,425 @@
+package com.wajahatnaeem.oneplusota.extract.engine
+
+import android.content.Context
+import android.net.Uri
+import chromeos_update_engine.UpdateMetadata.DeltaArchiveManifest
+import chromeos_update_engine.UpdateMetadata.InstallOperation
+import com.wajahatnaeem.oneplusota.extract.network.RangeHttpClient
+import com.wajahatnaeem.oneplusota.extract.network.ServerCapabilityChecker
+import com.wajahatnaeem.oneplusota.extract.payload.PayloadExtractor
+import com.wajahatnaeem.oneplusota.extract.payload.PayloadHeader
+import com.wajahatnaeem.oneplusota.extract.payload.PayloadManifest
+import com.wajahatnaeem.oneplusota.extract.payload.PartitionInfo
+import com.wajahatnaeem.oneplusota.extract.payload.SourceReader
+import com.wajahatnaeem.oneplusota.extract.resume.ExtractionState
+import com.wajahatnaeem.oneplusota.extract.resume.ExtractionStateStore
+import com.wajahatnaeem.oneplusota.extract.zip.ZipRemoteParser
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.OutputStream
+import java.io.RandomAccessFile
+
+// ── Data models ──────────────────────────────────────────────────────────────
+
+data class OtaFileEntry(
+    val name: String,
+    val offset: Long,
+    val size: Long,
+    /**
+     * If true, [offset] points directly to the start of the file's data (skipping ZIP header).
+     * This is standard for 'ota-property-files' in the 'metadata' file.
+     * If false, [offset] points to the ZIP local file header.
+     */
+    val isDataOffset: Boolean = false
+)
+
+
+data class OtaMetadataMap(
+    val entries: Map<String, OtaFileEntry>,
+    val otaType: String,
+    val otaId: String,
+    val postBuild: String,
+    val securityPatch: String
+) {
+    fun require(name: String): OtaFileEntry =
+        entries[name] ?: error("'$name' not found in OTA metadata")
+
+    val hasMetadataFile: Boolean get() = entries.isNotEmpty()
+}
+
+// ── Main extractor ────────────────────────────────────────────────────────────
+
+class OtaExtractor(private val context: Context) {
+
+    private val http       = RangeHttpClient()
+    private val checker    = ServerCapabilityChecker()
+    private val stateStore = ExtractionStateStore(context)
+
+    companion object {
+        /**
+         * Candidate names for the plaintext metadata file.
+         */
+        private val METADATA_ENTRY_NAMES = listOf(
+            "metadata",                       // modern OPPO / Realme OTAs
+            "META-INF/com/android/metadata",  // legacy / some OEM variants
+            "META-INF/com/android/metadata.pb" // newer protobuf metadata (rare)
+        )
+    }
+
+    data class Session(
+        val url: String,
+        val metadataMap: OtaMetadataMap,
+        val manifest: DeltaArchiveManifest,
+        val header: PayloadHeader,
+        val extractor: PayloadExtractor? = null,
+        val localUri: Uri? = null,
+        val localPayloadFile: java.io.File? = null,
+        val localPayloadOffset: Long? = null,
+        val localPayloadSize: Long? = null,
+        var sourceFile: java.io.File? = null
+    )
+
+    // ── Step 1: fetch & parse OTA metadata ───────────────────────────────────
+
+    suspend fun fetchMetadataMap(url: String): OtaMetadataMap = withContext(Dispatchers.IO) {
+        val caps = checker.check(url)
+        require(caps.supportsRangeRequests) {
+            "Server at $url does not support HTTP Range requests. " +
+                    "Cannot perform partial extraction."
+        }
+        require(caps.contentLength > 0) {
+            "Could not determine OTA file size. Server may not return Content-Length."
+        }
+
+        val zipParser = ZipRemoteParser(url, http, caps.contentLength)
+
+        // ── Try each known metadata entry name ───────────────────────────────
+        var metaMap: OtaMetadataMap? = null
+        for (candidateName in METADATA_ENTRY_NAMES) {
+            val entry = runCatching { zipParser.findEntry(candidateName) }.getOrNull()
+                ?: continue
+
+            val dataOffset = zipParser.resolveDataOffset(entry)
+            val metaText = String(
+                http.fetchBytes(url, dataOffset, dataOffset + entry.compressedSize - 1),
+                Charsets.UTF_8
+            )
+
+            if (candidateName.endsWith(".pb")) continue
+
+            metaMap = parseMetadata(metaText)
+            break
+        }
+
+        if (metaMap != null) {
+            if (metaMap.entries.containsKey("payload.bin")) {
+                return@withContext metaMap
+            }
+
+            val payloadEntry = runCatching { zipParser.findEntry("payload.bin") }.getOrNull()
+            if (payloadEntry != null) {
+                val updatedEntries = metaMap.entries.toMutableMap()
+                updatedEntries["payload.bin"] = OtaFileEntry(
+                    "payload.bin",
+                    payloadEntry.localHeaderOffset,
+                    payloadEntry.compressedSize,
+                    isDataOffset = false
+                )
+                return@withContext metaMap.copy(entries = updatedEntries)
+            }
+            error("Found 'metadata' file but 'payload.bin' is missing.")
+        }
+
+        // Fallback: minimal map from payload.bin
+        val payloadEntry = runCatching { zipParser.findEntry("payload.bin") }.getOrNull()
+            ?: error("Could not locate 'metadata' or 'payload.bin' in the ZIP.")
+
+        val entries = mapOf(
+            "payload.bin" to OtaFileEntry(
+                "payload.bin",
+                payloadEntry.localHeaderOffset,
+                payloadEntry.compressedSize,
+                isDataOffset = false
+            )
+        )
+        OtaMetadataMap(
+            entries       = entries,
+            otaType       = "AB",
+            otaId         = "",
+            postBuild     = "",
+            securityPatch = ""
+        )
+    }
+
+    private fun parseMetadata(text: String): OtaMetadataMap {
+        val props = mutableMapOf<String, String>()
+        text.lines().forEach { line ->
+            val eq = line.indexOf('=')
+            if (eq > 0) props[line.substring(0, eq).trim()] = line.substring(eq + 1).trim()
+        }
+
+        val propertyFiles = props["ota-property-files"] ?: ""
+
+        val entries = propertyFiles.trim().split(",")
+            .mapNotNull { token ->
+                val parts = token.trim().split(":")
+                if (parts.size == 3) {
+                    val name   = parts[0].trim()
+                    val offset = parts[1].trim().toLongOrNull() ?: return@mapNotNull null
+                    val size   = parts[2].trim().toLongOrNull() ?: return@mapNotNull null
+                    name to OtaFileEntry(name, offset, size, isDataOffset = true)
+                } else null
+            }.toMap()
+
+        return OtaMetadataMap(
+            entries       = entries,
+            otaType       = props["ota-type"] ?: "AB",
+            otaId         = props["ota-id"] ?: props["ota_version"] ?: props["ota-version"] ?: "",
+            postBuild     = props["post-build"] ?: "",
+            securityPatch = props["post-security-patch-level"]
+                ?: props["security_patch"]
+                ?: props["google_patch"]
+                ?: ""
+        )
+    }
+
+    // ── Step 2: open session ─────────────────────────────────────────────────
+
+    suspend fun open(url: String): Session = withContext(Dispatchers.IO) {
+        if (!url.startsWith("http", ignoreCase = true)) {
+            return@withContext openLocal(Uri.parse(url))
+        }
+
+        val metadataMap = fetchMetadataMap(url)
+        val payloadEntry = metadataMap.require("payload.bin")
+
+        val payloadDataOffset = if (payloadEntry.isDataOffset) {
+            payloadEntry.offset
+        } else {
+            val localHeaderBytes = http.fetchBytes(
+                url,
+                payloadEntry.offset,
+                payloadEntry.offset + 29
+            )
+            val filenameLen = leShort(localHeaderBytes, 26)
+            val extraLen    = leShort(localHeaderBytes, 28)
+            payloadEntry.offset + 30 + filenameLen + extraLen
+        }
+
+        val manifester = PayloadManifest(url, http, payloadDataOffset)
+        val header     = manifester.readHeader()
+        val manifest   = manifester.readManifest(header)
+
+        // Incremental (delta) OTAs contain patches rather than full images.
+        // We allow opening them to list partitions, but extraction will require a source partition.
+
+        val blockSize = if (manifest.hasBlockSize()) manifest.blockSize.toLong() else 4096L
+        val extractor = PayloadExtractor(url, http, header, blockSize)
+        Session(url, metadataMap, manifest, header, extractor)
+    }
+
+    private fun openLocal(uri: Uri): Session {
+        val metadataText = LocalMetadataReader.readText(context, uri)
+        val metadataMap = metadataText
+            ?.takeUnless { it.isBlank() }
+            ?.let(::parseMetadata)
+            ?: OtaMetadataMap(
+                entries = emptyMap(),
+                otaType = "AB",
+                otaId = "",
+                postBuild = "",
+                securityPatch = ""
+            )
+
+        val reader = LocalRangeReader(context, uri)
+        var fastFound = false
+        var fastHeader: PayloadHeader? = null
+        var fastManifest: DeltaArchiveManifest? = null
+        var payloadOffset: Long? = null
+        var payloadSize: Long? = null
+
+        try {
+            val zipParser = LocalZipParser(reader)
+            val payloadEntry = runCatching { zipParser.findEntry("payload.bin") }.getOrNull()
+            if (payloadEntry != null && payloadEntry.compressionMethod == 0) {
+                val dataOffset = zipParser.resolveDataOffset(payloadEntry)
+                payloadOffset = dataOffset
+                payloadSize = payloadEntry.uncompressedSize
+
+                val offsetReader = OffsetLocalByteReader(reader, dataOffset, payloadSize)
+                val manifester = LocalPayloadManifest(offsetReader, 0L)
+                fastHeader = manifester.readHeader()
+                fastManifest = manifester.readManifest(fastHeader)
+                fastFound = true
+            }
+        } catch (e: Exception) {
+            // fallback gracefully
+        } finally {
+            reader.close()
+        }
+
+        val header: PayloadHeader
+        val manifest: DeltaArchiveManifest
+
+        if (fastFound) {
+            header = fastHeader!!
+            manifest = fastManifest!!
+        } else {
+            val preview = LocalMetadataReader.readPayloadPreview(context, uri)
+            header = preview.first
+            manifest = preview.second
+        }
+
+        // Incremental (delta) OTAs contain patches rather than full images.
+        // We allow opening them to list partitions, but extraction will require a source partition.
+
+        return Session(
+            url = uri.toString(),
+            metadataMap = metadataMap,
+            manifest = manifest,
+            header = header,
+            localUri = uri,
+            localPayloadOffset = payloadOffset,
+            localPayloadSize = payloadSize
+        )
+    }
+
+    // ── Step 3: list partitions ───────────────────────────────────────────────
+
+    suspend fun listPartitions(session: Session): List<PartitionInfo> =
+        withContext(Dispatchers.IO) {
+            session.manifest.partitionsList.map { p ->
+                PartitionInfo(
+                    name      = p.partitionName,
+                    sizeBytes = p.newPartitionInfo.size,
+                    opCount   = p.operationsList.size
+                )
+            }.sortedBy { it.name }
+        }
+
+    // ── Step 4: extract ───────────────────────────────────────────────────────
+
+    suspend fun extractToFile(
+        session: Session,
+        partitionName: String,
+        file: java.io.File,
+        onProgress: suspend (ExtractionState) -> Unit = {}
+    ): ExtractionState = withContext(Dispatchers.IO) {
+        val rawResume = stateStore.load(partitionName)
+
+        val resume = if (rawResume != null && file.exists() && file.length() >= rawResume.bytesWritten) {
+            // Truncate file to exact verified byte boundary to eliminate uncommitted buffer drift
+            java.io.RandomAccessFile(file, "rw").use { it.setLength(rawResume.bytesWritten) }
+            rawResume
+        } else {
+            stateStore.clear(partitionName)
+            file.takeIf { it.exists() }?.delete()
+            null
+        }
+
+        // If resuming, open in append mode.
+        val outputStream = java.io.BufferedOutputStream(java.io.FileOutputStream(file, resume != null), 1024 * 1024)
+
+        outputStream.use { os ->
+            extract(session, partitionName, os, onProgress)
+        }
+    }
+
+    suspend fun extract(
+        session: Session,
+        partitionName: String,
+        output: java.io.OutputStream,
+        onProgress: suspend (ExtractionState) -> Unit = {}
+    ): ExtractionState = withContext(Dispatchers.IO) {
+        val resume = stateStore.load(partitionName)
+        val sourceReader = session.sourceFile?.let { FileSourceReader(it) }
+
+        val finalState = if (session.extractor != null) {
+            val extractorWithSource = if (sourceReader != null) {
+                PayloadExtractor(session.url, http, session.header,
+                    if (session.manifest.hasBlockSize()) session.manifest.blockSize.toLong() else 4096L,
+                    sourceReader)
+            } else session.extractor
+
+            extractorWithSource.extract(
+                partitionName = partitionName,
+                manifest = session.manifest,
+                output = output,
+                resumeState = resume
+            ) { done, total, opIdx ->
+                val state = ExtractionState(partitionName, opIdx, done, total)
+                stateStore.save(state)
+                onProgress(state)
+            }
+        } else if (session.localPayloadOffset != null && session.localPayloadSize != null && session.localUri != null) {
+            // Fast extraction skipping cache by using Offset IO mapping directly against the ZIP
+            val baseReader = LocalRangeReader(context, session.localUri)
+            val offsetReader = OffsetLocalByteReader(baseReader, session.localPayloadOffset, session.localPayloadSize)
+            offsetReader.use { reader ->
+                val blockSize = if (session.manifest.hasBlockSize()) session.manifest.blockSize.toLong() else 4096L
+                val localExtractor = LocalPayloadExtractor(reader, session.header, blockSize, sourceReader)
+                localExtractor.extract(
+                    partitionName = partitionName,
+                    manifest = session.manifest,
+                    output = output,
+                    resumeState = resume
+                ) { done, total, opIdx ->
+                    val state = ExtractionState(partitionName, opIdx, done, total)
+                    stateStore.save(state)
+                    onProgress(state)
+                }
+            }
+        } else {
+            val localPayloadFile = session.localPayloadFile
+                ?: LocalMetadataReader.extractPayloadToCache(
+                    context,
+                    requireNotNull(session.localUri) { "Missing local OTA URI." }
+                )
+            LocalFileReader(localPayloadFile).use { reader ->
+                val blockSize = if (session.manifest.hasBlockSize()) session.manifest.blockSize.toLong() else 4096L
+                val localExtractor = LocalPayloadExtractor(reader, session.header, blockSize, sourceReader)
+                localExtractor.extract(
+                    partitionName = partitionName,
+                    manifest = session.manifest,
+                    output = output,
+                    resumeState = resume
+                ) { done, total, opIdx ->
+                    val state = ExtractionState(partitionName, opIdx, done, total)
+                    stateStore.save(state)
+                    onProgress(state)
+                }
+            }
+        }
+        stateStore.clear(partitionName)
+        finalState
+    }
+
+    private class FileSourceReader(private val file: java.io.File) : SourceReader, java.io.Closeable {
+        private val raf = java.io.RandomAccessFile(file, "r")
+        private val channel = raf.channel
+
+        override fun readBlocks(startBlock: Long, numBlocks: Long, blockSize: Long): ByteArray {
+            val length = (numBlocks * blockSize).toInt()
+            val data = ByteArray(length)
+            val buffer = java.nio.ByteBuffer.wrap(data)
+            var totalRead = 0
+            while (totalRead < length) {
+                val read = channel.read(buffer, startBlock * blockSize + totalRead)
+                if (read <= 0) error("Unexpected EOF while reading source partition.")
+                totalRead += read
+            }
+            return data
+        }
+
+        override fun close() {
+            raf.close()
+        }
+    }
+
+    fun clearExtractionState(partitionName: String) {
+        stateStore.clear(partitionName)
+    }
+
+    private fun leShort(bytes: ByteArray, offset: Int): Int =
+        ((bytes[offset + 1].toInt() and 0xFF) shl 8) or (bytes[offset].toInt() and 0xFF)
+}

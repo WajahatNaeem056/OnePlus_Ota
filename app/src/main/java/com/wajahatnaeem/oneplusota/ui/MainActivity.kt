@@ -85,12 +85,13 @@ private fun Root(vm: OtaViewModel) {
             detectHorizontalDragGestures(
                 onDragStart = { total = 0f },
                 onHorizontalDrag = { _, dx -> total += dx },
-                onDragEnd = { if (total < -threshold) tab = (tab + 1).coerceAtMost(2) else if (total > threshold) tab = (tab - 1).coerceAtLeast(0) },
+                onDragEnd = { if (total < -threshold) tab = (tab + 1).coerceAtMost(3) else if (total > threshold) tab = (tab - 1).coerceAtLeast(0) },
             )
         }) {
             when {
                 tab == 0 || !vm.device.isOnePlus -> UpdateTab(vm)
                 tab == 1 -> OtherTab(vm)
+                tab == 2 -> ExtractTab()
                 else -> SettingsTab(vm)
             }
         }
@@ -105,7 +106,8 @@ private fun FloatingBar(selected: Int, onSelect: (Int) -> Unit) {
             Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 BarItem(0, selected, AppIcons.SystemUpdate, "My phone", onSelect)
                 BarItem(1, selected, AppIcons.Devices, "Devices", onSelect)
-                BarItem(2, selected, AppIcons.Settings, "Settings", onSelect)
+                BarItem(2, selected, AppIcons.Extract, "Extract", onSelect)
+                BarItem(3, selected, AppIcons.Settings, "Settings", onSelect)
             }
         }
     }
@@ -121,7 +123,7 @@ private fun BarItem(index: Int, selected: Int, icon: ImageVector, label: String,
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(20.dp))
-        // Three tabs would not fit with all labels, so only the selected one shows its name.
+        // Four tabs would not fit with all labels, so only the selected one shows its name.
         if (on) Text(label, color = fg, fontWeight = FontWeight.SemiBold)
     }
 }
