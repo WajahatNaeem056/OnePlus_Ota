@@ -493,8 +493,12 @@ private fun DownloadCard(vm: OtaViewModel, s: DlState) {
                 is DlState.Done -> {
                     Text("Download complete ✓", style = MaterialTheme.typography.titleSmall)
                     Text(when (s.md5Ok) { true -> "MD5 verified"; false -> "MD5 mismatch"; null -> "No MD5 available" })
-                    Text(s.path, style = MaterialTheme.typography.bodySmall)
-                    Button(onClick = { vm.exportToDownloads(s.path) }) { Text("Save to Downloads") }
+                    if (s.exported) {
+                        Text("Saved to ${s.path}", style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        Text(s.path, style = MaterialTheme.typography.bodySmall)
+                        Button(onClick = { vm.exportToDownloads(s.path) }) { Text("Save to Downloads") }
+                    }
                 }
                 DlState.Idle -> {}
             }

@@ -1,8 +1,12 @@
 package com.wajahatnaeem.oneplusota.download
 
+import android.content.ContentValues
 import android.content.Context
+import android.os.Environment
+import android.provider.MediaStore
 import com.wajahatnaeem.oneplusota.data.OtaPackage
 import com.wajahatnaeem.oneplusota.device.DeviceInfo
+import com.wajahatnaeem.oneplusota.extract.ExtractPaths
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONObject
@@ -14,7 +18,7 @@ sealed interface DlState {
     data class Paused(val pkg: OtaPackage, val done: Long, val total: Long, val reason: String) : DlState
     data class Failed(val pkg: OtaPackage, val done: Long, val total: Long, val message: String) : DlState
     data class Verifying(val pkg: OtaPackage) : DlState
-    data class Done(val pkg: OtaPackage, val path: String, val md5Ok: Boolean?) : DlState
+    data class Done(val pkg: OtaPackage, val path: String, val md5Ok: Boolean?, val exported: Boolean = false) : DlState
 }
 
 /** Mutable job: the url can be swapped when the link expires, etag/total are learned from the server. */
@@ -49,6 +53,40 @@ class DownloadStore(private val ctx: Context) {
 
     fun partFile(pkg: OtaPackage) = File(dir, safeName(pkg) + ".part")
     fun finalFile(pkg: OtaPackage) = File(dir, safeName(pkg))
+
+    /**
+     * Copies a finished file into public Downloads/OnePlusOTA (no storage permission needed) and returns the
+     * visible path. The source file is left alone: the caller deletes it only after this returned successfully.
+     */
+    fun exportToDownloads(file: File): String {
+        val resolver = ctx.contentResolver
+        val relative = "${Environment.DIRECTORY_DOWNLOADS}/${ExtractPaths.ROOT_DIR}"
+        // Same name again replaces the old copy instead of making "name (1).zip".
+        runCatching {
+            resolver.delete(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                "${MediaStore.Downloads.DISPLAY_NAME}=? AND ${MediaStore.Downloads.RELATIVE_PATH}=?",
+                arrayOf(file.name, "$relative/"),
+            )
+        }
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, file.name)
+            put(MediaStore.Downloads.MIME_TYPE, "application/zip")
+            put(MediaStore.Downloads.RELATIVE_PATH, relative)
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: error("Could not create ${file.name} in Downloads")
+        try {
+            val copied = resolver.openOutputStream(uri)!!.use { out -> file.inputStream().use { it.copyTo(out, 1 shl 16) } }
+            check(copied == file.length()) { "Copy incomplete ($copied of ${file.length()} bytes)" }
+            resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+        } catch (e: Exception) {
+            resolver.delete(uri, null, null)
+            throw e
+        }
+        return "Downloads/${ExtractPaths.ROOT_DIR}/${file.name}"
+    }
 
     fun load(): DlJob? = prefs.getString("job", null)?.let { runCatching { DlJob.fromJson(JSONObject(it)) }.getOrNull() }
     fun save(job: DlJob) { prefs.edit().putString("job", job.toJson().toString()).apply() }

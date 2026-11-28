@@ -21,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Foreground service: the download keeps running with the screen off / app in background. */
@@ -108,7 +109,16 @@ class DownloadService : Service() {
             fin.delete(); store.clear()
             DownloadCenter.set(DlState.Failed(pkg, 0, job.total, "MD5 mismatch: the file was corrupt, please download it again"))
         } else {
-            DownloadCenter.set(DlState.Done(pkg, fin.absolutePath, ok))
+            // Verified (or nothing to verify): put the zip in Downloads/OnePlusOTA by itself. The app-private copy is
+            // deleted only after the copy succeeded; if the copy fails the file stays here and the Save button is shown.
+            notify(buildNotif(pkg, job.total, job.total, "Saving to Downloads…", true))
+            val saved = withContext(Dispatchers.IO) { runCatching { store.exportToDownloads(fin) }.getOrNull() }
+            if (saved != null) {
+                fin.delete(); store.clear()
+                DownloadCenter.set(DlState.Done(pkg, saved, ok, exported = true))
+            } else {
+                DownloadCenter.set(DlState.Done(pkg, fin.absolutePath, ok))
+            }
         }
         stopForeground(STOP_FOREGROUND_DETACH)
         notify(buildNotif(pkg, job.total, job.total, when (ok) { false -> "Verification failed"; true -> "Download complete ✓ MD5 verified"; null -> "Download complete (no MD5 to verify)" }, false))

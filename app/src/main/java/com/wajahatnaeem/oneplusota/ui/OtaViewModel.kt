@@ -220,21 +220,13 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
         message = "Raw JSON copied"
     }
 
-    /** Copies the finished zip into public Downloads so the system updater's "local install" picker can see it. */
+    /** Fallback when the automatic copy failed: copies the finished zip into public Downloads/OnePlusOTA. */
     fun exportToDownloads(path: String) {
         viewModelScope.launch {
             val f = File(path)
             message = withContext(Dispatchers.IO) {
-                runCatching {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Downloads.DISPLAY_NAME, f.name)
-                        put(MediaStore.Downloads.MIME_TYPE, "application/zip")
-                        put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                    }
-                    val uri = app.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)!!
-                    app.contentResolver.openOutputStream(uri)!!.use { out -> f.inputStream().use { it.copyTo(out, 1 shl 16) } }
-                    "Saved to Downloads: ${f.name}"
-                }.getOrElse { "Export fail: ${it.message}" }
+                runCatching { "Saved to ${store.exportToDownloads(f)}" }
+                    .getOrElse { "Export fail: ${it.message}" }
             }
         }
     }
