@@ -275,11 +275,18 @@ private suspend fun resolve(
 ): SourceOutcome {
     val releases = if (dev.androidRelease.isBlank()) listOf("", "17", "16") else listOf(dev.androidRelease)
     var last: SourceOutcome = SourceOutcome.Error("")
+    var best: SourceOutcome.Found? = null
     for (r in releases) {
-        last = resolveOnce(client, dev.copy(androidRelease = r), servers, fullOnly, type)
-        if (last is SourceOutcome.Found) break
+        val out = resolveOnce(client, dev.copy(androidRelease = r), servers, fullOnly, type)
+        if (out is SourceOutcome.Found) {
+            // A blank release answers with an older Android line, so keep asking and keep the newest build.
+            val b = best
+            if (b == null || isNewerVersion(out.pkg.version, b.pkg.version)) best = out
+            // A phone that knows its own Android release has just one entry, so nothing more to ask.
+            if (dev.androidRelease.isNotBlank()) break
+        } else if (best == null) last = out
     }
-    return last
+    return best ?: last
 }
 
 private suspend fun resolveOnce(
