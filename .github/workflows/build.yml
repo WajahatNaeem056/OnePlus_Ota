@@ -39,26 +39,26 @@ jobs:
             echo "SIGNED=true" >> "$GITHUB_ENV"
           fi
 
-      - name: Build APK
+      # Always builds the debug (testing) APK. The signed release APK is built too when the signing secrets exist.
+      - name: Build APKs
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ "$SIGNED" = "true" ]; then
-            gradle assembleRelease --stacktrace
-          else
-            gradle assembleDebug --stacktrace
-          fi
+          TASKS="assembleDebug"
+          if [ "$SIGNED" = "true" ]; then TASKS="$TASKS assembleRelease"; fi
+          gradle $TASKS --stacktrace
 
-      - name: Name the APK with its version
+      - name: Name the APKs with their version
         run: |
           VERSION=$(grep -m1 'versionName' app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
           mkdir -p dist
+          cp app/build/outputs/apk/debug/*.apk "dist/OnePlusOTA-v${VERSION}-debug.apk"
           if [ "$SIGNED" = "true" ]; then
             cp app/build/outputs/apk/release/*.apk "dist/OnePlusOTA-v${VERSION}.apk"
           else
-            cp app/build/outputs/apk/debug/*.apk "dist/OnePlusOTA-v${VERSION}-debug.apk"
+            echo "::warning::Signing secrets not set, only the debug APK was built."
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           ls -l dist
