@@ -43,8 +43,12 @@ class DownloadStore(private val ctx: Context) {
     private val prefs = ctx.getSharedPreferences("ota_download", Context.MODE_PRIVATE)
     val dir: File get() = ctx.getExternalFilesDir("ota") ?: File(ctx.filesDir, "ota").also { it.mkdirs() }
 
-    fun partFile(pkg: OtaPackage) = File(dir, pkg.fileName + ".part")
-    fun finalFile(pkg: OtaPackage) = File(dir, pkg.fileName)
+    /** Server-supplied names are never trusted as paths: keep only the last segment, never "." / "..". */
+    private fun safeName(pkg: OtaPackage) =
+        File(pkg.fileName).name.takeIf { it.isNotBlank() && it != "." && it != ".." } ?: "ota.zip"
+
+    fun partFile(pkg: OtaPackage) = File(dir, safeName(pkg) + ".part")
+    fun finalFile(pkg: OtaPackage) = File(dir, safeName(pkg))
 
     fun load(): DlJob? = prefs.getString("job", null)?.let { runCatching { DlJob.fromJson(JSONObject(it)) }.getOrNull() }
     fun save(job: DlJob) { prefs.edit().putString("job", job.toJson().toString()).apply() }

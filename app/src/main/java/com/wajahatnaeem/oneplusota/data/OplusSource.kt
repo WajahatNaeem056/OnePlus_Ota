@@ -1,6 +1,7 @@
 package com.wajahatnaeem.oneplusota.data
 
 import android.util.Log
+import com.wajahatnaeem.oneplusota.BuildConfig
 import com.wajahatnaeem.oneplusota.device.DeviceInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -105,7 +106,7 @@ class OplusClient(private val http: OkHttpClient) {
             }
             val plain = OplusCrypto.decrypt(enc.getString("cipher"), enc.getString("iv"), session)
             lastRawJson = plain
-            Log.d("OplusClient", "decrypted: ${plain.take(400)}")
+            if (BuildConfig.DEBUG) Log.d("OplusClient", "decrypted: ${plain.take(400)}")
             return JSONObject(plain)
         }
     }

@@ -111,7 +111,7 @@ class DownloadService : Service() {
             DownloadCenter.set(DlState.Done(pkg, fin.absolutePath, ok))
         }
         stopForeground(STOP_FOREGROUND_DETACH)
-        notify(buildNotif(pkg, job.total, job.total, if (ok == false) "Verification failed" else "Download complete ✓", false))
+        notify(buildNotif(pkg, job.total, job.total, when (ok) { false -> "Verification failed"; true -> "Download complete ✓ MD5 verified"; null -> "Download complete (no MD5 to verify)" }, false))
         stopSelf()
     }
 
