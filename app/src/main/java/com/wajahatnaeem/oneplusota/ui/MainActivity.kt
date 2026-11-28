@@ -59,7 +59,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import kotlin.math.abs
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.pointerInput
 
 class MainActivity : ComponentActivity() {
@@ -96,21 +100,41 @@ private fun Root(vm: OtaViewModel) {
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.statusBarsPadding().fillMaxSize().pointerInput(vm.device.isOnePlus) {
             if (!vm.device.isOnePlus) return@pointerInput
-            val threshold = 80.dp.toPx()
-            var total = 0f
-            detectHorizontalDragGestures(
-                onDragStart = { total = 0f },
-                onHorizontalDrag = { _, dx -> total += dx },
-                onDragEnd = { if (total < -threshold) tab = (tab + 1).coerceAtMost(3) else if (total > threshold) tab = (tab - 1).coerceAtLeast(0) },
-            )
+            val trigger = 48.dp.toPx()
+            val flingV = 500.dp.toPx()
+            val slop = viewConfiguration.touchSlop
+            // Watched in the Initial pass: the lists underneath grab slightly-diagonal finger drags first, so this never sees them in the Main pass.
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                val tracker = VelocityTracker()
+                tracker.addPosition(down.uptimeMillis, down.position)
+                var dx = 0f
+                var dy = 0f
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val c = event.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!c.pressed) {
+                        val v = tracker.calculateVelocity().x
+                        if (abs(dx) > slop && abs(dx) > abs(dy) * 1.2f && abs(v) > flingV) tab = (tab + if (dx < 0) 1 else -1).coerceIn(0, 3)
+                        break
+                    }
+                    tracker.addPosition(c.uptimeMillis, c.position)
+                    dx += c.position.x - c.previousPosition.x
+                    dy += c.position.y - c.previousPosition.y
+                    if (abs(dx) > trigger && abs(dx) > abs(dy) * 1.5f) {
+                        tab = (tab + if (dx < 0) 1 else -1).coerceIn(0, 3)
+                        break
+                    }
+                }
+            }
         }) {
             // Slides in the direction of travel, so swiping and tapping feel the same.
             AnimatedContent(
                 targetState = if (vm.device.isOnePlus) tab else 0,
                 transitionSpec = {
                     val dir = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 5 * dir } + fadeIn(tween(260))) togetherWith
-                        (slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { -it / 5 * dir } + fadeOut(tween(160)))
+                    (slideInHorizontally(tween(180, easing = FastOutSlowInEasing)) { it / 5 * dir } + fadeIn(tween(140))) togetherWith
+                        (slideOutHorizontally(tween(180, easing = FastOutSlowInEasing)) { -it / 5 * dir } + fadeOut(tween(90)))
                 },
                 label = "tabs",
             ) { page ->

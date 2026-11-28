@@ -149,6 +149,28 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
     val otherSpec: DeviceInfo?
         get() = variant?.let { v -> selected?.let { v.toDeviceInfo(it.name, it.android) } }
 
+    // ---- ARB (anti-rollback) of the found package, read from its xbl_config ----------------------------
+    private val arbChecker by lazy { com.wajahatnaeem.oneplusota.extract.arb.ArbChecker(app) }
+    /** key = package version; value = text for the chip. */
+    var arbText by mutableStateOf<Map<String, String>>(emptyMap())
+        private set
+
+    private fun checkArb(pkg: OtaPackage) {
+        arbText[pkg.version]?.let { if (it != "ARB N/A") return }
+        arbText = arbText + (pkg.version to "ARB …")
+        viewModelScope.launch {
+            val url = if (pkg.url.contains("/downloadCheck", ignoreCase = true))
+                (ServiceLocator.linkResolver.resolve(pkg.url) as? LinkStatus.Live)?.finalUrl ?: pkg.url else pkg.url
+            val r = arbChecker.check(url)
+            val t = when {
+                r == null -> "ARB N/A"
+                r.arb == 0 -> "ARB 0 · Safe"
+                else -> "ARB ${r.arb} · Protected"
+            }
+            arbText = arbText + (pkg.version to t)
+        }
+    }
+
     fun checkOther() {
         val spec = otherSpec ?: return
         if (variant?.conflict == true) {
@@ -158,14 +180,18 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             otherCheck = CheckUi.Loading; linkFor = null; linkStatus = LinkStatus.Idle
-            otherCheck = CheckUi.Result(ServiceLocator.chain.check(spec, fullOnly)); otherCheckedAt = System.currentTimeMillis()
+            val res = ServiceLocator.chain.check(spec, fullOnly)
+            otherCheck = CheckUi.Result(res); otherCheckedAt = System.currentTimeMillis()
+            (res as? CheckResult.Found)?.let { checkArb(it.pkg) }
         }
     }
 
     fun checkUpdate() {
         viewModelScope.launch {
             check = CheckUi.Loading; linkFor = null; linkStatus = LinkStatus.Idle
-            check = CheckUi.Result(ServiceLocator.chain.check(updateSpec, fullOnly)); checkedAt = System.currentTimeMillis()
+            val res = ServiceLocator.chain.check(updateSpec, fullOnly)
+            check = CheckUi.Result(res); checkedAt = System.currentTimeMillis()
+            (res as? CheckResult.Found)?.let { checkArb(it.pkg) }
         }
     }
 
