@@ -7,7 +7,22 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -34,6 +49,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -88,11 +104,22 @@ private fun Root(vm: OtaViewModel) {
                 onDragEnd = { if (total < -threshold) tab = (tab + 1).coerceAtMost(3) else if (total > threshold) tab = (tab - 1).coerceAtLeast(0) },
             )
         }) {
-            when {
-                tab == 0 || !vm.device.isOnePlus -> UpdateTab(vm)
-                tab == 1 -> OtherTab(vm)
-                tab == 2 -> ExtractTab()
-                else -> SettingsTab(vm)
+            // Slides in the direction of travel, so swiping and tapping feel the same.
+            AnimatedContent(
+                targetState = if (vm.device.isOnePlus) tab else 0,
+                transitionSpec = {
+                    val dir = if (targetState > initialState) 1 else -1
+                    (slideInHorizontally(tween(320, easing = FastOutSlowInEasing)) { it / 5 * dir } + fadeIn(tween(260))) togetherWith
+                        (slideOutHorizontally(tween(320, easing = FastOutSlowInEasing)) { -it / 5 * dir } + fadeOut(tween(160)))
+                },
+                label = "tabs",
+            ) { page ->
+                when (page) {
+                    0 -> UpdateTab(vm)
+                    1 -> OtherTab(vm)
+                    2 -> ExtractTab()
+                    else -> SettingsTab(vm)
+                }
             }
         }
         if (vm.device.isOnePlus) Box(Modifier.align(Alignment.BottomCenter)) { FloatingBar(tab) { tab = it } }
@@ -116,14 +143,33 @@ private fun FloatingBar(selected: Int, onSelect: (Int) -> Unit) {
 @Composable
 private fun BarItem(index: Int, selected: Int, icon: ImageVector, label: String, onSelect: (Int) -> Unit) {
     val on = index == selected
-    val bg = if (on) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
-    val fg = if (on) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val bg by animateColorAsState(
+        if (on) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+        tween(280, easing = FastOutSlowInEasing), label = "bg",
+    )
+    val fg by animateColorAsState(
+        if (on) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        tween(280, easing = FastOutSlowInEasing), label = "fg",
+    )
+    // No ripple: it was drawing a lighter patch over the selected pill.
+    val noRipple = remember { MutableInteractionSource() }
     Row(
-        Modifier.clip(RoundedCornerShape(24.dp)).background(bg).clickable { onSelect(index) }.padding(horizontal = if (on) 20.dp else 16.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(bg)
+            .clickable(interactionSource = noRipple, indication = null) { onSelect(index) }
+            .padding(horizontal = if (on) 20.dp else 16.dp, vertical = 11.dp)
+            .animateContentSize(spring(dampingRatio = 0.85f, stiffness = 380f)),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(20.dp))
         // Four tabs would not fit with all labels, so only the selected one shows its name.
-        if (on) Text(label, color = fg, fontWeight = FontWeight.SemiBold)
+        AnimatedVisibility(
+            visible = on,
+            enter = expandHorizontally(tween(280, easing = FastOutSlowInEasing)) + fadeIn(tween(240, delayMillis = 60)),
+            exit = shrinkHorizontally(tween(220, easing = FastOutSlowInEasing)) + fadeOut(tween(120)),
+        ) {
+            Text(label, color = fg, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false, modifier = Modifier.padding(start = 8.dp))
+        }
     }
 }
