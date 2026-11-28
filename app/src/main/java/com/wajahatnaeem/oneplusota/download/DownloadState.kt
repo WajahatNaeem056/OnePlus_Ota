@@ -21,10 +21,11 @@ sealed interface DlState {
 class DlJob(
     var pkg: OtaPackage, var etag: String? = null, var lastModified: String? = null,
     var total: Long = pkg.sizeBytes, var spec: DeviceInfo? = null,
+    var noMulti: Boolean = false,
 ) {
     fun toJson(): JSONObject = JSONObject().put("pkg", pkg.toJson())
         .put("etag", etag ?: JSONObject.NULL).put("lastModified", lastModified ?: JSONObject.NULL).put("total", total)
-        .put("spec", spec?.toJson() ?: JSONObject.NULL)
+        .put("spec", spec?.toJson() ?: JSONObject.NULL).put("noMulti", noMulti)
 
     companion object {
         fun fromJson(o: JSONObject) = DlJob(
@@ -33,6 +34,7 @@ class DlJob(
             lastModified = o.optString("lastModified").takeIf { it.isNotBlank() && it != "null" },
             total = o.optLong("total", 0L),
             spec = o.optJSONObject("spec")?.let { DeviceInfo.fromJson(it) },
+            noMulti = o.optBoolean("noMulti", false),
         )
     }
 }
@@ -63,7 +65,7 @@ object DownloadCenter {
     fun restore(store: DownloadStore) {
         if (_state.value !is DlState.Idle) return
         val job = store.load() ?: return
-        val done = store.partFile(job.pkg).takeIf { it.exists() }?.length() ?: 0L
+        val done = ResumableDownloader.downloaded(store.partFile(job.pkg))
         val fin = store.finalFile(job.pkg)
         _state.value = when {
             fin.exists() -> DlState.Done(job.pkg, fin.absolutePath, null)

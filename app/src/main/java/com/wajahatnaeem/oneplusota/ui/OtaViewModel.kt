@@ -19,6 +19,7 @@ import com.wajahatnaeem.oneplusota.data.CatalogVariant
 import com.wajahatnaeem.oneplusota.data.CheckResult
 import com.wajahatnaeem.oneplusota.data.LinkStatus
 import com.wajahatnaeem.oneplusota.data.OtaPackage
+import com.wajahatnaeem.oneplusota.download.ResumableDownloader
 import com.wajahatnaeem.oneplusota.device.DeviceInfo
 import com.wajahatnaeem.oneplusota.device.DeviceReader
 import com.wajahatnaeem.oneplusota.download.DlJob
@@ -198,7 +199,7 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
     fun download(pkg: OtaPackage, spec: DeviceInfo) {
         val existing = store.load()
         val sameFile = existing != null && existing.pkg.fileName == pkg.fileName
-        if (existing != null && !sameFile) store.partFile(existing.pkg).delete()
+        if (existing != null && !sameFile) ResumableDownloader.deleteAll(store.partFile(existing.pkg))
         // Same file + partial data on disk -> keep it. The download continues from that byte.
         val job = if (sameFile) existing!!.also { it.pkg = pkg; it.spec = spec } else DlJob(pkg, spec = spec)
         store.save(job)

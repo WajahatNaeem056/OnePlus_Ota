@@ -21,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Foreground service: the download keeps running with the screen off / app in background. */
 class DownloadService : Service() {
@@ -44,27 +45,35 @@ class DownloadService : Service() {
         when (intent?.action) {
             ACTION_PAUSE -> pause("Paused by you")
             ACTION_CANCEL -> cancel()
-            ACTION_START, ACTION_RESUME -> begin()
+            ACTION_START -> begin(resume = false)
+            ACTION_RESUME -> begin(resume = true)
             // null intent = Android restarted us after killing the process
-            else -> if (store.active) begin() else stopSelf()
+            else -> if (store.active) begin(resume = true) else stopSelf()
         }
         return START_STICKY
     }
 
-    private fun begin() {
+    private fun begin(resume: Boolean) {
         val job = store.load() ?: run { stopSelf(); return }
         store.active = true
         val part = store.partFile(job.pkg)
-        startFg(buildNotif(job.pkg, part.takeIf { it.exists() }?.length() ?: 0L, job.total, "Starting…", running = true))
+        startFg(buildNotif(job.pkg, ResumableDownloader.downloaded(part), job.total, "Starting…", running = true))
         worker?.cancel()
         worker = scope.launch {
-            DownloadCenter.set(DlState.Active(job.pkg, part.takeIf { it.exists() }?.length() ?: 0L, job.total, 0, null))
+            DownloadCenter.set(DlState.Active(job.pkg, ResumableDownloader.downloaded(part), job.total, 0, null))
+            val refresh: suspend () -> OtaPackage? = {
+                val r = ServiceLocator.chain.check(job.spec ?: DeviceReader.read(), fullOnly = true)
+                (r as? CheckResult.Found)?.pkg
+            }
+            if (resume) {
+                // Retry / Resume: the old link may be dead, so fetch a fresh one first. Same file only; on any problem keep the old link.
+                DownloadCenter.set(DlState.Active(job.pkg, ResumableDownloader.downloaded(part), job.total, 0, "Fetching a fresh link…"))
+                val fresh = withTimeoutOrNull(20_000) { runCatching { refresh() }.getOrNull() }
+                if (fresh != null && downloader.adopt(job, fresh, part, allowDifferent = false)) store.save(job)
+            }
             val result = downloader.run(
                 job = job, part = part,
-                refresh = {
-                    val r = ServiceLocator.chain.check(job.spec ?: DeviceReader.read(), fullOnly = true)
-                    (r as? CheckResult.Found)?.pkg
-                },
+                refresh = refresh,
                 onProgress = { done, total, bps, note ->
                     DownloadCenter.set(DlState.Active(job.pkg, done, total, bps, note))
                     store.save(job) // keeps etag / refreshed url / total across process death
@@ -75,7 +84,7 @@ class DownloadService : Service() {
             when (result) {
                 is RunResult.Completed -> finish(job)
                 is RunResult.GaveUp -> {
-                    val done = part.takeIf { it.exists() }?.length() ?: 0L
+                    val done = ResumableDownloader.downloaded(part)
                     DownloadCenter.set(DlState.Failed(job.pkg, done, job.total, result.message))
                     store.active = false
                     stopForeground(STOP_FOREGROUND_DETACH)
@@ -91,7 +100,7 @@ class DownloadService : Service() {
         val part = store.partFile(pkg); val fin = store.finalFile(pkg)
         DownloadCenter.set(DlState.Verifying(pkg))
         notify(buildNotif(pkg, job.total, job.total, "Verifying MD5…", true))
-        fin.delete(); part.renameTo(fin)
+        fin.delete(); part.renameTo(fin); ResumableDownloader.segFile(part).delete()
         val ok: Boolean? = pkg.md5?.let { ResumableDownloader.md5Of(fin).equals(it, ignoreCase = true) }
         store.active = false
         if (ok == false) {
@@ -109,7 +118,7 @@ class DownloadService : Service() {
     private fun pause(reason: String) {
         val job = store.load() ?: return
         worker?.cancel(); store.active = false
-        val done = store.partFile(job.pkg).takeIf { it.exists() }?.length() ?: 0L
+        val done = ResumableDownloader.downloaded(store.partFile(job.pkg))
         DownloadCenter.set(DlState.Paused(job.pkg, done, job.total, reason))
         stopForeground(STOP_FOREGROUND_DETACH)
         notify(buildNotif(job.pkg, done, job.total, "Paused", running = false))
@@ -119,7 +128,7 @@ class DownloadService : Service() {
     private fun cancel() {
         val job = store.load()
         worker?.cancel(); store.active = false
-        job?.let { store.partFile(it.pkg).delete() }
+        job?.let { ResumableDownloader.deleteAll(store.partFile(it.pkg)) }
         store.clear(); DownloadCenter.set(DlState.Idle)
         stopForeground(STOP_FOREGROUND_REMOVE); stopSelf()
     }
