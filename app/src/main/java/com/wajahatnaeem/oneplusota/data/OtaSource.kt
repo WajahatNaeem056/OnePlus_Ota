@@ -16,8 +16,10 @@ class SourceChain(private val groups: List<List<OtaSource>>, private val links: 
         val notes = mutableListOf<String>()
         var sawNoUpdate = false
         for (group in groups) {
+            // China devices: the OnePlus server only. The backup source is never asked (regionId 1 = China).
+            val active = if (dev.regionId == 1) group.filter { it.type != SourceType.OXYGEN_UPDATER } else group
             val outs = coroutineScope {
-                group.map { s ->
+                active.map { s ->
                     async {
                         s to runCatching { s.fetch(dev, fullOnly) }
                             .getOrElse { SourceOutcome.Error("${it.javaClass.simpleName}: ${it.message}") }
@@ -37,7 +39,11 @@ class SourceChain(private val groups: List<List<OtaSource>>, private val links: 
                         if (v is RegionGuard.Verdict.Unverifiable) notes += "${s.type.label}: package model couldn't be verified"
                         found += out.pkg
                         val b = best
-                        if (b == null || isNewerVersion(out.pkg.cmpVersion(), b.cmpVersion())) best = out.pkg
+                        // Newest version wins. Same version on both servers: the OnePlus server wins, the backup only fills in when it is newer.
+                        val newer = b != null && isNewerVersion(out.pkg.cmpVersion(), b.cmpVersion())
+                        val sameButOfficial = b != null && !newer && !isNewerVersion(b.cmpVersion(), out.pkg.cmpVersion()) &&
+                            out.pkg.source == SourceType.OPLUS_DIRECT && b.source != SourceType.OPLUS_DIRECT
+                        if (b == null || newer || sameButOfficial) best = out.pkg
                     }
                 }
                 is SourceOutcome.NoUpdate -> { sawNoUpdate = true; notes += "${s.type.label}: ${out.message}" }
