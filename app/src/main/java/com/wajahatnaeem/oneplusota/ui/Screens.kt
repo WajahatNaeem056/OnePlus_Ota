@@ -302,7 +302,6 @@ private fun FoldCard(title: String, content: @Composable () -> Unit) {
     }
 }
 
-@Composable
 private enum class UpdateState { UpToDate, Available, Unknown }
 
 /** First number group of a version like CPH2691_17.0.0.105(EX01C30P01) -> [17, 0, 0, 105]. The "(EX01...)" tail is ignored. */
