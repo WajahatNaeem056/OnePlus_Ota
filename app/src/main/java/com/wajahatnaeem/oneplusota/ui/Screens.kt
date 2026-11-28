@@ -136,8 +136,8 @@ fun UpdateTab(vm: OtaViewModel) {
                 Text(if (vm.check == CheckUi.Loading) "Checking across update servers…" else if (vm.check is CheckUi.Result) "Check again" else "Check for update")
             }
         }
-        item { CheckCard(vm, vm.check, false, vm.checkedAt, current = vm.device) { start(it, vm.updateSpec) } }
-        item { DownloadCard(vm, dl) }
+        item { CheckCard(vm, vm.check, false, vm.checkedAt, current = vm.device, dl = dl) { start(it, vm.updateSpec) } }
+        if (vm.check.foundPkg()?.let { dl.isFor(it) } != true) item { DownloadCard(vm, dl) }
         vm.message?.let { m -> item { Text(m, color = MaterialTheme.colorScheme.primary) } }
         item { androidx.compose.foundation.layout.Spacer(Modifier.padding(8.dp)) }
     }
@@ -215,9 +215,9 @@ fun OtherTab(vm: OtaViewModel) {
                 }
             }
             item {
-                CheckCard(vm, vm.otherCheck, true, vm.otherCheckedAt) { pkg -> vm.otherSpec?.let { start(pkg, it) } }
+                CheckCard(vm, vm.otherCheck, true, vm.otherCheckedAt, dl = dl) { pkg -> vm.otherSpec?.let { start(pkg, it) } }
             }
-            item { DownloadCard(vm, dl) }
+            if (vm.otherCheck.foundPkg()?.let { dl.isFor(it) } != true) item { DownloadCard(vm, dl) }
             vm.message?.let { m -> item { Text(m, color = MaterialTheme.colorScheme.primary) } }
         }
         item { androidx.compose.foundation.layout.Spacer(Modifier.padding(8.dp)) }
@@ -382,7 +382,7 @@ private fun CheckingIndicator() {
 }
 
 @Composable
-private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedAt: Long, current: DeviceInfo? = null, onDownload: (OtaPackage) -> Unit) {
+private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedAt: Long, current: DeviceInfo? = null, dl: DlState = DlState.Idle, onDownload: (OtaPackage) -> Unit) {
     val ctx = LocalContext.current
     when (state) {
         CheckUi.Idle -> {}
@@ -421,7 +421,9 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedA
                                 r.pkg.securityPatch?.let { Chip("Patch $it") }
                                 vm.arbText[r.pkg.version]?.let { Chip(it) }
                             }
-                            Button(onClick = { onDownload(r.pkg) }, shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                            if (dl.isFor(r.pkg)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { DownloadBody(vm, dl) }
+                            } else Button(onClick = { onDownload(r.pkg) }, shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
                                 Icon(AppIcons.Download, null, Modifier.size(22.dp)); Spacer(Modifier.width(8.dp))
                                 Text("Download")
                             }
@@ -460,10 +462,32 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedA
 private fun DownloadCard(vm: OtaViewModel, s: DlState) {
     if (s is DlState.Idle) return
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { DownloadBody(vm, s) }
+    }
+}
+
+private fun CheckUi.foundPkg(): OtaPackage? = ((this as? CheckUi.Result)?.r as? CheckResult.Found)?.pkg
+
+private fun DlState.pkgOrNull(): OtaPackage? = when (this) {
+    is DlState.Active -> pkg
+    is DlState.Paused -> pkg
+    is DlState.Failed -> pkg
+    is DlState.Verifying -> pkg
+    is DlState.Done -> pkg
+    DlState.Idle -> null
+}
+
+private fun DlState.isFor(pkg: OtaPackage) = pkgOrNull()?.version == pkg.version
+
+/** Download progress / result: shown inside the result card, or alone in its own card when no matching result is on screen. */
+@Composable
+private fun androidx.compose.foundation.layout.ColumnScope.DownloadBody(vm: OtaViewModel, s: DlState) {
             when (s) {
                 is DlState.Active -> {
-                    Text(s.pkg.fileName, style = MaterialTheme.typography.titleSmall)
+                    Text("Download started. It will be saved to Downloads/OnePlusOTA when finished.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (s.total > 0) "Downloading… ${(s.done * 100 / s.total).coerceIn(0L, 100L)}%" else "Downloading…",
+                        style = MaterialTheme.typography.titleSmall)
                     Progress(s.done, s.total)
                     Text("${fmt(s.done)} / ${fmt(s.total)} · ${if (s.bps > 0) "%.1f MB/s".format(s.bps / 1048576.0) else "…"}")
                     s.note?.let { Text(it, color = MaterialTheme.colorScheme.tertiary) }
@@ -507,8 +531,6 @@ private fun DownloadCard(vm: OtaViewModel, s: DlState) {
                 }
                 DlState.Idle -> {}
             }
-        }
-    }
 }
 
 @Composable
