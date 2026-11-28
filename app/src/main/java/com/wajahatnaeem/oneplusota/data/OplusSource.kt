@@ -199,6 +199,9 @@ class OplusClient(private val http: OkHttpClient) {
     }
 }
 
+/** The branch letters OnePlus actually uses (same set OTA Pulse sweeps), instead of all of A-Z. */
+private val PROBE_LETTERS = listOf('A', 'C', 'F', 'H', 'J')
+
 internal val REGION_SUFFIXES = listOf("EEA", "IN", "RU", "TR", "CN", "EU", "TW", "MEA", "SA", "SG", "TH", "LATAM", "BR", "MY", "ID", "KZ", "OCA", "VN", "GLO", "PH", "LK")
 
 /**
@@ -267,11 +270,11 @@ private suspend fun resolveOnce(
     fullOnly: Boolean, type: SourceType,
 ): SourceOutcome = coroutineScope {
     // Full-only: ask as old builds (server hands out the newest full zip) and as the phone's real build.
-    // Catalog devices don't know their build letter, so every letter is tried and the newest full package wins.
+    // Catalog devices don't know their build letter, so the real OnePlus branch letters are tried and the newest full package wins.
     val versions = buildList {
         if (fullOnly) {
             syntheticOtaVersion(dev)?.let { add(it) }
-            if (dev.probe) ('A'..'Z').forEach { c -> syntheticOtaVersion(dev, c.toString())?.let { add(it) } }
+            if (dev.probe) PROBE_LETTERS.forEach { c -> syntheticOtaVersion(dev, c.toString())?.let { add(it) } }
         }
         add(dev.otaVersion)
     }.distinct()
