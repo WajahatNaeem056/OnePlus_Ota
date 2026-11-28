@@ -484,12 +484,17 @@ private fun DlState.isFor(pkg: OtaPackage) = pkgOrNull()?.version == pkg.version
 private fun androidx.compose.foundation.layout.ColumnScope.DownloadBody(vm: OtaViewModel, s: DlState) {
             when (s) {
                 is DlState.Active -> {
-                    Text("Download started. It will be saved to Downloads/OnePlusOTA when finished.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(if (s.total > 0) "Downloading… ${(s.done * 100 / s.total).coerceIn(0L, 100L)}%" else "Downloading…",
-                        style = MaterialTheme.typography.titleSmall)
+                    val pct = if (s.total > 0) (s.done * 100.0 / s.total).coerceIn(0.0, 100.0) else -1.0
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                        Text(if (pct >= 0) (if (pct < 1) "%.2f%%" else "%.1f%%").format(pct) else "Downloading…",
+                            style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
+                        etaText(s.done, s.total, s.bps)?.let {
+                            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                     Progress(s.done, s.total)
-                    Text("${fmt(s.done)} / ${fmt(s.total)} · ${if (s.bps > 0) "%.1f MB/s".format(s.bps / 1048576.0) else "…"}")
+                    Text("${fmt(s.done)} / ${fmt(s.total)} · ${if (s.bps > 0) "%.1f MB/s".format(s.bps / 1048576.0) else "…"} · saves to Downloads/OnePlusOTA",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     s.note?.let { Text(it, color = MaterialTheme.colorScheme.tertiary) }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = vm::pause) { Text("Pause") }
@@ -520,10 +525,27 @@ private fun androidx.compose.foundation.layout.ColumnScope.DownloadBody(vm: OtaV
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
                 is DlState.Done -> {
-                    Text("Download complete ✓", style = MaterialTheme.typography.titleSmall)
-                    Text(when (s.md5Ok) { true -> "MD5 verified"; false -> "MD5 mismatch"; null -> "No MD5 available" })
+                    val ctx = LocalContext.current
+                    val green = if (isSystemInDarkTheme()) Color(0xFF81C995) else Color(0xFF1E8E3E)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(AppIcons.CheckCircle, null, Modifier.size(22.dp), tint = green)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Download complete", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = green)
+                    }
+                    Text(s.pkg.version, style = MaterialTheme.typography.titleSmall)
+                    Text(when (s.md5Ok) { true -> "MD5 verified"; false -> "MD5 mismatch"; null -> "No MD5 available" } +
+                        if (s.exported) " · saved to Downloads/OnePlusOTA" else "",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (s.exported) {
-                        Text("Saved to ${s.path}", style = MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = {
+                                runCatching {
+                                    ctx.startActivity(android.content.Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                                }
+                            }) { Text("Open Downloads") }
+                            OutlinedButton(onClick = { LinkTools.copy(ctx, "Path", s.path) }) { Text("Copy path") }
+                        }
                     } else {
                         Text(s.path, style = MaterialTheme.typography.bodySmall)
                         Button(onClick = { vm.exportToDownloads(s.path) }) { Text("Save to Downloads") }
@@ -531,6 +553,19 @@ private fun androidx.compose.foundation.layout.ColumnScope.DownloadBody(vm: OtaV
                 }
                 DlState.Idle -> {}
             }
+}
+
+private fun etaText(done: Long, total: Long, bps: Long): String? {
+    if (total <= 0 || bps <= 0 || done >= total) return null
+    val secs = (total - done) / bps
+    val h = secs / 3600
+    val m = (secs % 3600) / 60
+    return when {
+        h > 0 && m > 0 -> "about ${h}h ${m}m left"
+        h > 0 -> "about ${h}h left"
+        m > 0 -> "about ${m}m left"
+        else -> "less than a minute left"
+    }
 }
 
 @Composable
