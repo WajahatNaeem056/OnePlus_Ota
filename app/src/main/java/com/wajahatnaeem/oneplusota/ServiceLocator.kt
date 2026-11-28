@@ -3,7 +3,6 @@ package com.wajahatnaeem.oneplusota
 import android.content.Context
 import com.wajahatnaeem.oneplusota.data.OplusClient
 import com.wajahatnaeem.oneplusota.data.OplusDirectSource
-import com.wajahatnaeem.oneplusota.data.OplusGatewayFallbackSource
 import com.wajahatnaeem.oneplusota.data.OxygenUpdaterSource
 import com.wajahatnaeem.oneplusota.data.SourceChain
 import okhttp3.OkHttpClient
@@ -26,12 +25,11 @@ object ServiceLocator {
         com.wajahatnaeem.oneplusota.data.DeviceCatalog(http)
     }
 
-    /** 1) OnePlus server + backup source together, newest wins  2) other OnePlus gateways as last resort. */
+    /** The device's own region gateway + the backup source together, newest verified package wins. No other-region fallback. */
     val chain: SourceChain by lazy {
         SourceChain(
             listOf(
                 listOf(OplusDirectSource(oplusClient), OxygenUpdaterSource(http)),
-                listOf(OplusGatewayFallbackSource(oplusClient)),
             ),
             linkResolver,
         )

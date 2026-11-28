@@ -10,7 +10,10 @@ import org.json.JSONObject
 import java.io.File
 
 /** One region build of a device (e.g. 13R / EU / CPH2645EEA). */
-data class CatalogVariant(val region: String, val productModel: String, val productName: String?, val letter: String, val reqMode: String = "manual") {
+data class CatalogVariant(val region: String, val productModel: String, val productName: String?, val letter: String, val reqMode: String = "manual",
+    /** Another device entry in the list claims this same model/product, so its region can't be trusted: never queried. */
+    val conflict: Boolean = false,
+) {
     val isChina: Boolean get() = region.equals("CN", true) || region.startsWith("Genshin", true)
     val regionId: Int get() = if (isChina) 1 else when (region.uppercase()) { "IN" -> 2; "EU" -> 3; else -> 0 }
     /** Short tag shown in the list, e.g. "EU", "IN", "GLO", "CN". */
@@ -78,8 +81,23 @@ class DeviceCatalog(private val http: OkHttpClient) {
         )
     }
 
+    private fun identity(model: String, productName: String) = "${model.trim()}|${productName.trim()}".uppercase()
+
     fun parse(text: String): List<CatalogDevice> {
         val arr = JSONArray(text)
+        // A model/product identity can belong to exactly one device entry. If two entries claim it the list can't say
+        // which is right, so those variants are flagged and refused instead of being served under the wrong device/region.
+        val owners = mutableMapOf<String, MutableSet<Int>>()
+        for (i in 0 until arr.length()) {
+            val vs = arr.optJSONObject(i)?.optJSONArray("variants") ?: continue
+            for (j in 0 until vs.length()) {
+                val o = vs.optJSONObject(j) ?: continue
+                val model = o.optString("productModel")
+                if (model.isBlank()) continue
+                owners.getOrPut(identity(model, o.optString("productName"))) { mutableSetOf() } += i
+            }
+        }
+        val conflicts = owners.filterValues { it.size > 1 }.keys
         val out = mutableListOf<CatalogDevice>()
         for (i in 0 until arr.length()) {
             val d = arr.optJSONObject(i) ?: continue
@@ -95,6 +113,7 @@ class DeviceCatalog(private val http: OkHttpClient) {
                     productName = o.optString("productName").ifBlank { null },
                     letter = "A",
                     reqMode = o.optString("reqMode").ifBlank { "manual" },
+                    conflict = identity(model, o.optString("productName")) in conflicts,
                 )
             }
             d.optJSONArray("variants")?.let { v -> for (j in 0 until v.length()) v.optJSONObject(j)?.let(::add) }

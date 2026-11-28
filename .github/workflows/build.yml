@@ -21,6 +21,9 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Validate device list
+        run: python3 tools/validate_catalog.py
+
       - name: Build debug APK
         run: gradle assembleDebug --stacktrace
 

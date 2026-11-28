@@ -134,6 +134,11 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun checkOther() {
         val spec = otherSpec ?: return
+        if (variant?.conflict == true) {
+            otherCheck = CheckUi.Result(CheckResult.Failed(listOf("The device list assigns this model number to more than one device, so its region can't be confirmed. Not checking it.")))
+            otherCheckedAt = System.currentTimeMillis()
+            return
+        }
         viewModelScope.launch {
             otherCheck = CheckUi.Loading; linkFor = null; linkStatus = LinkStatus.Idle
             otherCheck = CheckUi.Result(ServiceLocator.chain.check(spec, fullOnly)); otherCheckedAt = System.currentTimeMillis()

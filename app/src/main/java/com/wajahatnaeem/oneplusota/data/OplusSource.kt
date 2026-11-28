@@ -33,6 +33,8 @@ class OplusClient(private val http: OkHttpClient) {
     }
 
     fun query(dev: DeviceInfo, server: OplusServers.Server, otaVersion: String): JSONObject {
+        // A device is only ever asked about on its own region's gateway; never send region A's identity to gateway B.
+        require(server.id == dev.regionId) { "Refusing cross-region query: device region ${dev.regionId} -> ${server.name} gateway" }
         val now = System.currentTimeMillis()
         val modelName = dev.product.ifBlank { dev.model } // e.g. CPH2747EEA (region build), not just CPH2747
         val prefix = otaVersion.split("_").take(2).joinToString("_")
@@ -171,7 +173,7 @@ class OplusClient(private val http: OkHttpClient) {
     companion object { const val FULL_MIN_BYTES = 2_000_000_000L }
 }
 
-private val REGION_SUFFIXES = listOf("EEA", "IN", "RU", "TR", "CN", "EU", "TW", "MEA", "SA", "SG", "TH", "LATAM", "BR", "MY", "ID", "KZ", "OCA", "VN", "GLO", "PH", "LK")
+internal val REGION_SUFFIXES = listOf("EEA", "IN", "RU", "TR", "CN", "EU", "TW", "MEA", "SA", "SG", "TH", "LATAM", "BR", "MY", "ID", "KZ", "OCA", "VN", "GLO", "PH", "LK")
 
 /**
  * An "old" build string for this device, e.g. "CPH2747NV44_11.C.01_0001_100001010000".
@@ -201,17 +203,8 @@ class OplusDirectSource(private val client: OplusClient) : OtaSource {
     override suspend fun fetch(dev: DeviceInfo, fullOnly: Boolean): SourceOutcome = withContext(Dispatchers.IO) {
         if (dev.otaVersion.isBlank()) return@withContext SourceOutcome.Error("Couldn't read ro.build.version.ota")
         val server = OplusServers.byId(dev.regionId)
+            ?: return@withContext SourceOutcome.Error("Unknown region id ${dev.regionId}, not querying any gateway")
         resolve(client, dev, listOf(server), fullOnly, type)
-    }
-}
-
-/** The "half" third source: same protocol, other regional gateways, tried one by one. */
-class OplusGatewayFallbackSource(private val client: OplusClient) : OtaSource {
-    override val type = SourceType.OPLUS_GATEWAYS
-
-    override suspend fun fetch(dev: DeviceInfo, fullOnly: Boolean): SourceOutcome = withContext(Dispatchers.IO) {
-        if (dev.otaVersion.isBlank()) return@withContext SourceOutcome.Error("OTA version missing")
-        resolve(client, dev.copy(probe = false), OplusServers.othersThan(dev.regionId), fullOnly, type)
     }
 }
 

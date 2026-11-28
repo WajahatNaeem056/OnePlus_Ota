@@ -27,10 +27,18 @@ class SourceChain(private val groups: List<List<OtaSource>>, private val links: 
             var best: OtaPackage? = null
             val found = mutableListOf<OtaPackage>()
             for ((s, out) in outs) when (out) {
-                is SourceOutcome.Found -> {
-                    found += out.pkg
-                    val b = best
-                    if (b == null || isNewerVersion(out.pkg.cmpVersion(), b.cmpVersion())) best = out.pkg
+                is SourceOutcome.Found -> when (val v = RegionGuard.verify(dev, out.pkg)) {
+                    is RegionGuard.Verdict.Mismatch -> {
+                        // The source answered, but with a package for another model/region build: never show it.
+                        sawNoUpdate = true
+                        notes += "${s.type.label}: rejected a package for ${v.found}, this device is ${v.expected}"
+                    }
+                    else -> {
+                        if (v is RegionGuard.Verdict.Unverifiable) notes += "${s.type.label}: package model couldn't be verified"
+                        found += out.pkg
+                        val b = best
+                        if (b == null || isNewerVersion(out.pkg.cmpVersion(), b.cmpVersion())) best = out.pkg
+                    }
                 }
                 is SourceOutcome.NoUpdate -> { sawNoUpdate = true; notes += "${s.type.label}: ${out.message}" }
                 is SourceOutcome.Error -> notes += "${s.type.label}: ${out.message}"

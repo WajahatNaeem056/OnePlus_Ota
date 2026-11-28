@@ -5,6 +5,7 @@ import org.json.JSONObject
 enum class SourceType(val label: String) {
     OPLUS_DIRECT("OnePlus Server"),
     OXYGEN_UPDATER("Backup server"),
+    /** Legacy: cross-region gateway fallback was removed; kept only so old saved downloads still load. */
     OPLUS_GATEWAYS("OnePlus Gateway"),
 }
 

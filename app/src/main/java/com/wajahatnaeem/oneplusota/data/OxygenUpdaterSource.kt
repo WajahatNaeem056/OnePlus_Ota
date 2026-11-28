@@ -44,14 +44,15 @@ class OxygenUpdaterSource(private val http: OkHttpClient) : OtaSource {
     override suspend fun fetch(dev: DeviceInfo, fullOnly: Boolean): SourceOutcome = withContext(Dispatchers.IO) {
         if (dev.regionId == 1) return@withContext SourceOutcome.Error("Skipped: not used for China devices")
         val devices = JSONArray(get("devices/enabled"))
-        val wanted = setOf(dev.model, dev.product, dev.marketName).filter { it.isNotBlank() }.map { it.lowercase() }
-        var deviceId = -1L
-        for (i in 0 until devices.length()) {
-            val d = devices.optJSONObject(i) ?: continue
-            val values = strings(d).flatMap { it.split(',') }.map { it.trim().lowercase() }
-            if (wanted.any { it in values }) { deviceId = d.optLong("id", -1L); break }
+        // Model numbers only (never the marketing name, every region shares it), region-specific product name first,
+        // and an ambiguous match is refused instead of taking whichever device is listed first.
+        val deviceId = when (val m = RegionGuard.matchOxygenDevice(devices, dev)) {
+            is RegionGuard.OxygenMatch.Found -> m.id
+            is RegionGuard.OxygenMatch.None ->
+                return@withContext SourceOutcome.NoUpdate("Device not found on the backup server (${dev.product.ifBlank { dev.model }})")
+            is RegionGuard.OxygenMatch.Ambiguous ->
+                return@withContext SourceOutcome.NoUpdate("Backup server lists ${m.names.joinToString(" / ")} for ${dev.product.ifBlank { dev.model }}; region can't be told apart, not guessing")
         }
-        if (deviceId < 0) return@withContext SourceOutcome.NoUpdate("Device not found on the backup server (${dev.model})")
 
         val methods = JSONArray(get("updateMethods/$deviceId", "language" to "en"))
         var methodId = -1L

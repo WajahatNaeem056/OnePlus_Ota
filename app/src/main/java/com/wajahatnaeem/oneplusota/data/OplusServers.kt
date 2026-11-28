@@ -22,8 +22,6 @@ object OplusServers {
             "1615897067573"),
     )
 
-    fun byId(id: Int): Server = all.firstOrNull { it.id == id } ?: all[0]
-
-    /** Same-region gateway first, then the others (used by the fallback source). */
-    fun othersThan(id: Int): List<Server> = all.filter { it.id != id }
+    /** Exact region only. An unknown id is NOT silently mapped to the Global gateway. */
+    fun byId(id: Int): Server? = all.firstOrNull { it.id == id }
 }
