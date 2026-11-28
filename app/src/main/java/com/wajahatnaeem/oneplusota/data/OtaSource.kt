@@ -15,7 +15,7 @@ class SourceChain(
     private val groups: List<List<OtaSource>>,
     private val links: LinkResolver,
     /** China only: optional early-access lookup, shown next to (never instead of) the stable package. */
-    private val early: (suspend (DeviceInfo) -> OtaPackage?)? = null,
+    private val early: (suspend (DeviceInfo) -> SourceOutcome)? = null,
 ) {
     suspend fun check(dev: DeviceInfo, fullOnly: Boolean): CheckResult {
         val notes = mutableListOf<String>()
@@ -69,12 +69,18 @@ class SourceChain(
 
     /** Early-access build, only when it is a different, newer build for this same model. Every skip is logged. */
     private suspend fun earlyFor(dev: DeviceInfo, stable: OtaPackage, notes: MutableList<String>): OtaPackage? {
-        val lookup = early ?: return null
-        if (dev.regionId != 1 || dev.probe) return null // catalog ("Other" tab) devices have no real build to ask as
-        val e = runCatching { lookup(dev) }
-            .onFailure { notes += "Early access: ${it.javaClass.simpleName}: ${it.message}" }
-            .getOrNull()
-        if (e == null) { notes += "Early access: the server offered no test build"; return null }
+        val lookup = early
+        if (lookup == null) { notes += "Early access: not wired into this build"; return null }
+        if (dev.regionId != 1) { notes += "Early access: skipped, region id is ${dev.regionId} (needs 1 = China)"; return null }
+        if (dev.probe) { notes += "Early access: skipped, catalog device has no real build"; return null }
+        notes += "Early access: asked the server in taste mode"
+        val out = runCatching { lookup(dev) }
+            .getOrElse { SourceOutcome.Error("${it.javaClass.simpleName}: ${it.message}") }
+        val e = when (out) {
+            is SourceOutcome.Found -> out.pkg
+            is SourceOutcome.NoUpdate -> { notes += "Early access: ${out.message.ifBlank { "the server offered no test build" }}"; return null }
+            is SourceOutcome.Error -> { notes += "Early access: ${out.message.ifBlank { "request failed" }}"; return null }
+        }
         if (RegionGuard.verify(dev, e) is RegionGuard.Verdict.Mismatch) {
             notes += "Early access: rejected a package for another model"; return null
         }

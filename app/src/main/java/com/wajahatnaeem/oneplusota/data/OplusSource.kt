@@ -242,12 +242,15 @@ class OplusDirectSource(private val client: OplusClient) : OtaSource {
      * Kept separate from [fetch] so a test build can never replace the stable result.
      * Returns null when the server offers nothing in this mode.
      */
-    suspend fun fetchEarly(dev: DeviceInfo): OtaPackage? = withContext(Dispatchers.IO) {
-        // Early access depends on the phone's real build, so it makes no sense for catalog ("Other" tab) devices.
-        if (dev.regionId != 1 || dev.probe || dev.otaVersion.isBlank()) return@withContext null
-        val server = OplusServers.byId(dev.regionId) ?: return@withContext null
-        val out = resolve(client, dev.copy(reqMode = "taste"), listOf(server), true, type)
-        (out as? SourceOutcome.Found)?.pkg?.copy(earlyAccess = true)
+    suspend fun fetchEarly(dev: DeviceInfo): SourceOutcome = withContext(Dispatchers.IO) {
+        if (dev.otaVersion.isBlank()) return@withContext SourceOutcome.Error("couldn't read ro.build.version.ota")
+        val server = OplusServers.byId(dev.regionId)
+            ?: return@withContext SourceOutcome.Error("unknown region id ${dev.regionId}")
+        // The server's own answer (code / errMsg) is passed up, so the Source log shows why nothing came back.
+        when (val out = resolve(client, dev.copy(reqMode = "taste"), listOf(server), true, type)) {
+            is SourceOutcome.Found -> SourceOutcome.Found(out.pkg.copy(earlyAccess = true))
+            else -> out
+        }
     }
 }
 
