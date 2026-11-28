@@ -199,7 +199,7 @@ class OplusClient(private val http: OkHttpClient) {
     }
 }
 
-/** Branch letters OnePlus Global and China actually use (from the OTA Pulse OnePlus catalog), instead of all of A-Z. */
+/** Branch letters OnePlus Global and China actually use, instead of all of A-Z. */
 private val PROBE_LETTERS = listOf('A', 'C', 'F')
 
 internal val REGION_SUFFIXES = listOf("EEA", "IN", "RU", "TR", "CN", "EU", "TW", "MEA", "SA", "SG", "TH", "LATAM", "BR", "MY", "ID", "KZ", "OCA", "VN", "GLO", "PH", "LK")
