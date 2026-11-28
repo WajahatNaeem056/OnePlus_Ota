@@ -11,12 +11,7 @@ interface OtaSource {
 }
 
 /** Asks the first group of sources together and keeps the newest package; later groups only run when the earlier ones found nothing. */
-class SourceChain(
-    private val groups: List<List<OtaSource>>,
-    private val links: LinkResolver,
-    /** China only: optional early-access lookup, shown next to (never instead of) the stable package. */
-    private val early: (suspend (DeviceInfo) -> SourceOutcome)? = null,
-) {
+class SourceChain(private val groups: List<List<OtaSource>>, private val links: LinkResolver) {
     suspend fun check(dev: DeviceInfo, fullOnly: Boolean): CheckResult {
         val notes = mutableListOf<String>()
         var sawNoUpdate = false
@@ -60,34 +55,10 @@ class SourceChain(
                     changelog = b.changelog ?: same.firstNotNullOfOrNull { it.changelog },
                     securityPatch = b.securityPatch ?: same.firstNotNullOfOrNull { it.securityPatch },
                 )
-                val stable = withRealName(merged)
-                return CheckResult.Found(stable, notes, earlyFor(dev, stable, notes))
+                return CheckResult.Found(withRealName(merged), notes)
             }
         }
         return if (sawNoUpdate) CheckResult.NoPackage(notes) else CheckResult.Failed(notes)
-    }
-
-    /** Early-access build, only when it is a different, newer build for this same model. Every skip is logged. */
-    private suspend fun earlyFor(dev: DeviceInfo, stable: OtaPackage, notes: MutableList<String>): OtaPackage? {
-        val lookup = early
-        if (lookup == null) { notes += "Early access: not wired into this build"; return null }
-        if (dev.regionId != 1) { notes += "Early access: skipped, region id is ${dev.regionId} (needs 1 = China)"; return null }
-        if (dev.probe) { notes += "Early access: skipped, catalog device has no real build"; return null }
-        notes += "Early access: asked the server in taste mode"
-        val out = runCatching { lookup(dev) }
-            .getOrElse { SourceOutcome.Error("${it.javaClass.simpleName}: ${it.message}") }
-        val e = when (out) {
-            is SourceOutcome.Found -> out.pkg
-            is SourceOutcome.NoUpdate -> { notes += "Early access: ${out.message.ifBlank { "the server offered no test build" }}"; return null }
-            is SourceOutcome.Error -> { notes += "Early access: ${out.message.ifBlank { "request failed" }}"; return null }
-        }
-        if (RegionGuard.verify(dev, e) is RegionGuard.Verdict.Mismatch) {
-            notes += "Early access: rejected a package for another model"; return null
-        }
-        if (!isNewerVersion(e.cmpVersion(), stable.cmpVersion())) {
-            notes += "Early access: not newer than stable (${e.version}), hidden"; return null
-        }
-        return withRealName(e)
     }
 
     private suspend fun withRealName(pkg: OtaPackage): OtaPackage {

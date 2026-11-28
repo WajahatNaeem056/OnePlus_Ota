@@ -440,10 +440,6 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedA
                         }
                     }
                 }
-                r.early?.let { e ->
-                    Spacer(Modifier.height(12.dp))
-                    EarlyAccessCard(vm, e, other, ctx, onDownload)
-                }
             }
             is CheckResult.NoPackage, is CheckResult.Failed -> {
                 val notes = if (r is CheckResult.NoPackage) r.notes else (r as CheckResult.Failed).notes
@@ -454,41 +450,6 @@ private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedA
                         notes.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
                         OutlinedButton(onClick = vm::copyRawResponse) { Text("Copy raw server response") }
                     }
-                }
-            }
-        }
-    }
-}
-
-/** A test ("taste") build offered by the server. Always its own card, labelled, never in place of the stable one. */
-@Composable
-private fun EarlyAccessCard(vm: OtaViewModel, pkg: OtaPackage, other: Boolean, ctx: android.content.Context, onDownload: (OtaPackage) -> Unit) {
-    val inner = MaterialTheme.colorScheme.surfaceContainerLow
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(inner).padding(18.dp)) {
-                Text("Early access build", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(pkg.version, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                FlowRow(Modifier.padding(vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Chip(fmt(pkg.sizeBytes))
-                    Chip("Early access")
-                    pkg.securityPatch?.let { Chip("Patch $it") }
-                }
-                Text("A test build from the OnePlus server, not the stable update. Back up your data first.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 14.dp))
-                Button(onClick = { onDownload(pkg) }, shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth().height(52.dp)) {
-                    Icon(AppIcons.Download, null, Modifier.size(22.dp)); Spacer(Modifier.width(8.dp))
-                    Text("Download")
-                }
-            }
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(inner).padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)) { LinkSection(vm, pkg, other, ctx) }
-            pkg.changelogUrl?.let { u ->
-                OutlinedButton(onClick = { LinkTools.openWith(ctx, u) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Open official changelog")
                 }
             }
         }

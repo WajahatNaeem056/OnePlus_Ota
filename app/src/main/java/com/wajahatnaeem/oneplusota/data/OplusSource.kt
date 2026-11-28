@@ -236,22 +236,6 @@ class OplusDirectSource(private val client: OplusClient) : OtaSource {
             ?: return@withContext SourceOutcome.Error("Unknown region id ${dev.regionId}, not querying any gateway")
         resolve(client, dev, listOf(server), fullOnly, type)
     }
-
-    /**
-     * China only: asks the SAME OnePlus gateway in "taste" (early access) mode.
-     * Kept separate from [fetch] so a test build can never replace the stable result.
-     * Returns null when the server offers nothing in this mode.
-     */
-    suspend fun fetchEarly(dev: DeviceInfo): SourceOutcome = withContext(Dispatchers.IO) {
-        if (dev.otaVersion.isBlank()) return@withContext SourceOutcome.Error("couldn't read ro.build.version.ota")
-        val server = OplusServers.byId(dev.regionId)
-            ?: return@withContext SourceOutcome.Error("unknown region id ${dev.regionId}")
-        // The server's own answer (code / errMsg) is passed up, so the Source log shows why nothing came back.
-        when (val out = resolve(client, dev.copy(reqMode = "taste"), listOf(server), true, type)) {
-            is SourceOutcome.Found -> SourceOutcome.Found(out.pkg.copy(earlyAccess = true))
-            else -> out
-        }
-    }
 }
 
 private fun versionNums(v: String) =
@@ -275,18 +259,11 @@ private suspend fun resolve(
 ): SourceOutcome {
     val releases = if (dev.androidRelease.isBlank()) listOf("", "17", "16") else listOf(dev.androidRelease)
     var last: SourceOutcome = SourceOutcome.Error("")
-    var best: SourceOutcome.Found? = null
     for (r in releases) {
-        val out = resolveOnce(client, dev.copy(androidRelease = r), servers, fullOnly, type)
-        if (out is SourceOutcome.Found) {
-            // A blank release answers with an older Android line, so keep asking and keep the newest build.
-            val b = best
-            if (b == null || isNewerVersion(out.pkg.version, b.pkg.version)) best = out
-            // A phone that knows its own Android release has just one entry, so nothing more to ask.
-            if (dev.androidRelease.isNotBlank()) break
-        } else if (best == null) last = out
+        last = resolveOnce(client, dev.copy(androidRelease = r), servers, fullOnly, type)
+        if (last is SourceOutcome.Found) break
     }
-    return best ?: last
+    return last
 }
 
 private suspend fun resolveOnce(

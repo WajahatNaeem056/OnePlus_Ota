@@ -25,16 +25,13 @@ object ServiceLocator {
         com.wajahatnaeem.oneplusota.data.DeviceCatalog(http)
     }
 
-    private val oplusDirect by lazy { OplusDirectSource(oplusClient) }
-
     /** The device's own region gateway + the backup source together, newest verified package wins. No other-region fallback. */
     val chain: SourceChain by lazy {
         SourceChain(
             listOf(
-                listOf(oplusDirect, OxygenUpdaterSource(http)),
+                listOf(OplusDirectSource(oplusClient), OxygenUpdaterSource(http)),
             ),
             linkResolver,
-            early = { dev -> oplusDirect.fetchEarly(dev) },
         )
     }
 }
