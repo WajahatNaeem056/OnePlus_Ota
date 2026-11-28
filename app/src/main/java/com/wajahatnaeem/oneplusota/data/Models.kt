@@ -20,6 +20,10 @@ data class OtaPackage(
     val isFull: Boolean,
     val source: SourceType,
     val securityPatch: String? = null,
+    /** Official changelog page from the server (description.panelUrl). Usually Chinese for CN builds. */
+    val changelogUrl: String? = null,
+    /** A test ("taste") build the server offers on request. Never mixed with the stable result. */
+    val earlyAccess: Boolean = false,
 ) {
     fun toJson(): JSONObject = JSONObject()
         .put("version", version).put("otaVersion", otaVersion ?: JSONObject.NULL)
@@ -27,6 +31,8 @@ data class OtaPackage(
         .put("fileName", fileName).put("changelog", changelog ?: JSONObject.NULL)
         .put("isFull", isFull).put("source", source.name)
         .put("securityPatch", securityPatch ?: JSONObject.NULL)
+        .put("changelogUrl", changelogUrl ?: JSONObject.NULL)
+        .put("earlyAccess", earlyAccess)
 
     companion object {
         fun fromJson(o: JSONObject) = OtaPackage(
@@ -40,6 +46,8 @@ data class OtaPackage(
             isFull = o.optBoolean("isFull", false),
             source = runCatching { SourceType.valueOf(o.getString("source")) }.getOrDefault(SourceType.OPLUS_DIRECT),
             securityPatch = o.optString("securityPatch").takeIf { it.isNotBlank() && it != "null" },
+            changelogUrl = o.optString("changelogUrl").takeIf { it.isNotBlank() && it != "null" },
+            earlyAccess = o.optBoolean("earlyAccess", false),
         )
     }
 }
@@ -53,7 +61,7 @@ sealed interface SourceOutcome {
 
 /** Final answer after trying the chain. */
 sealed interface CheckResult {
-    data class Found(val pkg: OtaPackage, val notes: List<String>) : CheckResult
+    data class Found(val pkg: OtaPackage, val notes: List<String>, val early: OtaPackage? = null) : CheckResult
     data class NoPackage(val notes: List<String>) : CheckResult
     data class Failed(val notes: List<String>) : CheckResult
 }

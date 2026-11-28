@@ -11,7 +11,12 @@ interface OtaSource {
 }
 
 /** Asks the first group of sources together and keeps the newest package; later groups only run when the earlier ones found nothing. */
-class SourceChain(private val groups: List<List<OtaSource>>, private val links: LinkResolver) {
+class SourceChain(
+    private val groups: List<List<OtaSource>>,
+    private val links: LinkResolver,
+    /** China only: optional early-access lookup, shown next to (never instead of) the stable package. */
+    private val early: (suspend (DeviceInfo) -> OtaPackage?)? = null,
+) {
     suspend fun check(dev: DeviceInfo, fullOnly: Boolean): CheckResult {
         val notes = mutableListOf<String>()
         var sawNoUpdate = false
@@ -55,10 +60,28 @@ class SourceChain(private val groups: List<List<OtaSource>>, private val links: 
                     changelog = b.changelog ?: same.firstNotNullOfOrNull { it.changelog },
                     securityPatch = b.securityPatch ?: same.firstNotNullOfOrNull { it.securityPatch },
                 )
-                return CheckResult.Found(withRealName(merged), notes)
+                val stable = withRealName(merged)
+                return CheckResult.Found(stable, notes, earlyFor(dev, stable, notes))
             }
         }
         return if (sawNoUpdate) CheckResult.NoPackage(notes) else CheckResult.Failed(notes)
+    }
+
+    /** Early-access build, only when it is a different, newer build for this same model. Every skip is logged. */
+    private suspend fun earlyFor(dev: DeviceInfo, stable: OtaPackage, notes: MutableList<String>): OtaPackage? {
+        val lookup = early ?: return null
+        if (dev.regionId != 1 || dev.probe) return null // catalog ("Other" tab) devices have no real build to ask as
+        val e = runCatching { lookup(dev) }
+            .onFailure { notes += "Early access: ${it.javaClass.simpleName}: ${it.message}" }
+            .getOrNull()
+        if (e == null) { notes += "Early access: the server offered no test build"; return null }
+        if (RegionGuard.verify(dev, e) is RegionGuard.Verdict.Mismatch) {
+            notes += "Early access: rejected a package for another model"; return null
+        }
+        if (!isNewerVersion(e.cmpVersion(), stable.cmpVersion())) {
+            notes += "Early access: not newer than stable (${e.version}), hidden"; return null
+        }
+        return withRealName(e)
     }
 
     private suspend fun withRealName(pkg: OtaPackage): OtaPackage {

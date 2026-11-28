@@ -87,7 +87,8 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
             if (spec != null) {
                 val res = ServiceLocator.chain.check(spec, fullOnly)
                 if (res is CheckResult.Found) {
-                    use = res.pkg
+                    // An early-access card must get an early-access link, never the stable one.
+                    use = if (pkg.earlyAccess) (res.early ?: pkg) else res.pkg
                     if (other) { otherCheck = CheckUi.Result(res); otherCheckedAt = System.currentTimeMillis() } else { check = CheckUi.Result(res); checkedAt = System.currentTimeMillis() }
                 } else message = "Couldn't get a fresh link, copied the last one."
             }

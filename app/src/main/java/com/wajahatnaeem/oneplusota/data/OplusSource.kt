@@ -184,6 +184,7 @@ class OplusClient(private val http: OkHttpClient) {
                 fileName = name,
                 changelog = null,
                 securityPatch = findString(json, "securityPatch"),
+                changelogUrl = findString(json, "panelUrl"),
                 // Heuristic: not marked as patch AND big enough. Calibrate with raw JSON on the real device.
                 isFull = !incremental && size >= FULL_MIN_BYTES,
                 source = source,
@@ -234,6 +235,19 @@ class OplusDirectSource(private val client: OplusClient) : OtaSource {
         val server = OplusServers.byId(dev.regionId)
             ?: return@withContext SourceOutcome.Error("Unknown region id ${dev.regionId}, not querying any gateway")
         resolve(client, dev, listOf(server), fullOnly, type)
+    }
+
+    /**
+     * China only: asks the SAME OnePlus gateway in "taste" (early access) mode.
+     * Kept separate from [fetch] so a test build can never replace the stable result.
+     * Returns null when the server offers nothing in this mode.
+     */
+    suspend fun fetchEarly(dev: DeviceInfo): OtaPackage? = withContext(Dispatchers.IO) {
+        // Early access depends on the phone's real build, so it makes no sense for catalog ("Other" tab) devices.
+        if (dev.regionId != 1 || dev.probe || dev.otaVersion.isBlank()) return@withContext null
+        val server = OplusServers.byId(dev.regionId) ?: return@withContext null
+        val out = resolve(client, dev.copy(reqMode = "taste"), listOf(server), true, type)
+        (out as? SourceOutcome.Found)?.pkg?.copy(earlyAccess = true)
     }
 }
 
