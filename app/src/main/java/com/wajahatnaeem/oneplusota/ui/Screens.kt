@@ -48,6 +48,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.animation.Crossfade
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -130,7 +133,7 @@ fun UpdateTab(vm: OtaViewModel) {
             Button(onClick = vm::checkUpdate, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(26.dp),
                 enabled = vm.check != CheckUi.Loading) {
                 Icon(AppIcons.Refresh, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
-                Text(if (vm.check is CheckUi.Result) "Check again" else "Check for update")
+                Text(if (vm.check == CheckUi.Loading) "Checking across update servers…" else if (vm.check is CheckUi.Result) "Check again" else "Check for update")
             }
         }
         item { CheckCard(vm, vm.check, false, vm.checkedAt, current = vm.device) { start(it, vm.updateSpec) } }
@@ -208,7 +211,7 @@ fun OtherTab(vm: OtaViewModel) {
             }
             item {
                 Button(onClick = vm::checkOther, modifier = Modifier.fillMaxWidth(), enabled = vm.otherCheck != CheckUi.Loading) {
-                    Text("Find latest full OTA")
+                    Text(if (vm.otherCheck == CheckUi.Loading) "Checking across update servers…" else "Find latest full OTA")
                 }
             }
             item {
@@ -364,11 +367,26 @@ private fun updateState(dev: DeviceInfo, pkg: OtaPackage): UpdateState {
 }
 
 @Composable
+private fun CheckingIndicator() {
+    val steps = remember { listOf("Contacting the update server…", "Checking the backup server…", "Comparing versions…", "Almost there…") }
+    var step by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { delay(1800); if (step < steps.lastIndex) step++ } }
+    Column(Modifier.fillMaxWidth().padding(vertical = 40.dp), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        CircularProgressIndicator(Modifier.size(56.dp), strokeWidth = 5.dp)
+        Text("Searching across servers and versions…", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        Crossfade(step, label = "checkStep") {
+            Text(steps[it], style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
 private fun CheckCard(vm: OtaViewModel, state: CheckUi, other: Boolean, checkedAt: Long, current: DeviceInfo? = null, onDownload: (OtaPackage) -> Unit) {
     val ctx = LocalContext.current
     when (state) {
         CheckUi.Idle -> {}
-        CheckUi.Loading -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() }
+        CheckUi.Loading -> CheckingIndicator()
         is CheckUi.Result -> when (val r = state.r) {
             is CheckResult.Found -> {
                 var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
