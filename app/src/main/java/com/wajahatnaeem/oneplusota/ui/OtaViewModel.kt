@@ -51,7 +51,7 @@ class OtaViewModel(private val app: Application) : AndroidViewModel(app) {
         private set
 
     fun setTheme(mode: Int) { themeMode = mode; prefs.edit().putInt("theme", mode).apply() }
-    fun setAutoCheck(on: Boolean) { autoCheck = on; prefs.edit().putBoolean("auto_check", on).apply() }
+    fun changeAutoCheck(on: Boolean) { autoCheck = on; prefs.edit().putBoolean("auto_check", on).apply() }
 
     /** null = auto-detect */
     var regionId by mutableStateOf<Int?>(null)

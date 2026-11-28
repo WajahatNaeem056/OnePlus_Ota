@@ -255,7 +255,7 @@ fun SettingsTab(vm: OtaViewModel) {
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(Modifier.width(12.dp))
-                    Switch(checked = vm.autoCheck, onCheckedChange = { vm.setAutoCheck(it) })
+                    Switch(checked = vm.autoCheck, onCheckedChange = { vm.changeAutoCheck(it) })
                 }
             }
         }
